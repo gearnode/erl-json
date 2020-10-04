@@ -24,7 +24,7 @@
 -type error_reason() :: invalid_format
                       | truncated_escape_sequence
                       | {invalid_escape_sequence, binary()}
-                      | {invalid_pointer, pointer(), json:value()}
+                      | {invalid_pointer, binary(), json:value()}
                       | {invalid_array_index, reference_token() | integer()}.
 
 -spec parse(binary()) -> {ok, pointer()} | {error, error_reason()}.
@@ -95,10 +95,10 @@ eval_pointer(Pointer = [Token | Tokens], Value) when is_map(Value) ->
     {ok, Child} ->
       eval_pointer(Tokens, Child);
     error ->
-      {error, {invalid_pointer, Pointer, Value}}
+      {error, {invalid_pointer, serialize(Pointer), Value}}
   end;
 eval_pointer(Pointer = [<<"-">> | _], Value) when is_list(Value) ->
-  {error, {invalid_pointer, Pointer, Value}};
+  {error, {invalid_pointer, serialize(Pointer), Value}};
 eval_pointer(Pointer = [Token | Tokens], Value) when is_list(Value) ->
   try
     binary_to_integer(Token)
@@ -106,7 +106,7 @@ eval_pointer(Pointer = [Token | Tokens], Value) when is_list(Value) ->
     I when I >= 0, I < length(Value) ->
       eval_pointer(Tokens, lists:nth(I+1, Value));
     I when I >= 0 ->
-      {error, {invalid_pointer, Pointer, Value}};
+      {error, {invalid_pointer, serialize(Pointer), Value}};
     I ->
       {error, {invalid_array_index, I}}
   catch
@@ -114,4 +114,4 @@ eval_pointer(Pointer = [Token | Tokens], Value) when is_list(Value) ->
       {error, {invalid_array_index, Token}}
   end;
 eval_pointer(Pointer, Value) ->
-  {error, {invalid_pointer, Pointer, Value}}.
+  {error, {invalid_pointer, serialize(Pointer), Value}}.
