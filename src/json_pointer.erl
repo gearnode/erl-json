@@ -14,7 +14,7 @@
 
 -module(json_pointer).
 
--export([eval/2, eval_pointer/2, parse/1]).
+-export([parse/1, serialize/1, eval/2, eval_pointer/2]).
 
 -export_type([pointer/0, reference_token/0]).
 
@@ -56,6 +56,25 @@ parse_reference_token(<<$~>>, _) ->
   throw({error, truncated_escape_sequence});
 parse_reference_token(<<C, Data/binary>>, Acc) ->
   parse_reference_token(Data, <<Acc/binary, C>>).
+
+-spec serialize(pointer()) -> binary().
+serialize([]) ->
+  <<"">>;
+serialize(Pointer) ->
+  Tokens = lists:map(fun (T) -> serialize_reference_token(T, <<>>) end,
+                     Pointer),
+  Data =[$/, lists:join($/, Tokens)],
+  iolist_to_binary(Data).
+
+-spec serialize_reference_token(reference_token(), Acc :: binary()) -> binary().
+serialize_reference_token(<<>>, Acc) ->
+  Acc;
+serialize_reference_token(<<$/, Token/binary>>, Acc) ->
+  serialize_reference_token(Token, <<Acc/binary, $~, $1>>);
+serialize_reference_token(<<$~, Token/binary>>, Acc) ->
+  serialize_reference_token(Token, <<Acc/binary, $~, $0>>);
+serialize_reference_token(<<C, Token/binary>>, Acc) ->
+  serialize_reference_token(Token, <<Acc/binary, C>>).
 
 -spec eval(binary(), json:value())
           -> {ok, json:value()} | {error, error_reason()}.

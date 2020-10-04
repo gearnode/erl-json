@@ -43,6 +43,19 @@ parse_test_() ->
    ?_assertEqual({error, truncated_escape_sequence},
                  Parse(<<"/~/foo">>))].
 
+serialize_test_() ->
+  Serialize = fun json_pointer:serialize/1,
+  [?_assertEqual(<<"">>,
+                 Serialize([])),
+   ?_assertEqual(<<"/a">>,
+                 Serialize([<<"a">>])),
+   ?_assertEqual(<<"/a/b/c">>,
+                 Serialize([<<"a">>, <<"b">>, <<"c">>])),
+   ?_assertEqual(<<"//foo//">>,
+                 Serialize([<<"">>, <<"foo">>, <<"">>, <<"">>])),
+   ?_assertEqual(<<"/a~1b/~0c">>,
+                 Serialize([<<"a/b">>, <<"~c">>]))].
+
 eval_test_() ->
   Eval = fun json_pointer:eval/2,
   [?_assertEqual({error, invalid_format},
