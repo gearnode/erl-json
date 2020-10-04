@@ -48,6 +48,17 @@ Serialization options are represented as a map. The following options are availa
 - `return_binary`: return the final document as a binary instead of an iodata
   value.
 
+## JSON Pointer
+The `json_pointer:apply/2` function is used to parse a JSON Pointer string and
+to apply it to a JSON value.
+
+Example:
+```erlang
+json_pointer:eval(<<"/foo/2">>,
+                  #{<<"foo">> => [1, 2, 3],
+                    <<"bar">> => [4, 5]}).
+```
+
 # Types
 JSON values and Erlang terms are mapped according to the following table:
 

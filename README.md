@@ -1,6 +1,13 @@
 # Project
-This repository contains an implementation of the [JSON](https://www.json.org)
-data format as specified by [RFC 8259](https://tools.ietf.org/html/rfc8259).
+This repository contains implementations of various
+[JSON](https://www.json.org)-related systems.
+
+The project currently supports:
+
+- Parsing and serialization of JSON data as specified by [RFC
+  8259](https://tools.ietf.org/html/rfc8259).
+- JSON Pointer application as specified by [RFC
+  6901](https://tools.ietf.org/html/rfc6901).
 
 # Documentation
 A handbook is available [in the `doc`
