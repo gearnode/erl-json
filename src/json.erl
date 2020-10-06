@@ -24,8 +24,7 @@
 
 -type value() :: null
                | true | false
-               | integer()
-               | float()
+               | number()
                | binary()
                | [value()]
                | #{binary() := value()}.

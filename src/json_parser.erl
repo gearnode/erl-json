@@ -291,7 +291,7 @@ parse_object_member(P) ->
                       position => Position}})
   end.
 
--spec parse_number(parser()) -> {integer() | float(), parser()}.
+-spec parse_number(parser()) -> {number(), parser()}.
 parse_number(P) ->
   parse_number(P, sign, {1, undefined, 1, undefined}).
 
@@ -305,7 +305,7 @@ parse_number(P) ->
                     Base :: undefined | {integer, integer()} | {float, float()},
                     ExponentSign :: -1 | 1,
                     Exponent :: undefined | integer()}) ->
-        {integer() | float(), parser()}.
+        {number(), parser()}.
 %% Sign
 parse_number(P = #{data := <<$-, _/binary>>}, sign, {_, B, ES, E}) ->
   parse_number(skip1(P), integer_part, {-1, B, ES, E});
