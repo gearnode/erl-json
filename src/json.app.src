@@ -14,7 +14,7 @@
 
 {application, json,
  [{description, "Utilities for the JSON data format."},
-  {vsn, "1.0.0"},
+  {vsn, "1.0.1"},
   {registered, []},
   {applications,
    [kernel,
