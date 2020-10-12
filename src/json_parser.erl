@@ -149,9 +149,9 @@ parse_string(P = #{data := <<$\\, C, _/binary>>}, Acc) when
     Code1 >= 16#d800, Code1 =< 16#dbff ->
       {Code2, P3} = parse_unicode_escape_sequence(P2),
       Code = 16#10_000 + (Code1 - 16#d800 bsl 10) + (Code2 - 16#dc00),
-      parse_string(P3, <<Acc/binary, Code>>);
+      parse_string(P3, <<Acc/binary, Code/utf8>>);
     true ->
-      parse_string(P2, <<Acc/binary, Code1>>)
+      parse_string(P2, <<Acc/binary, Code1/utf8>>)
   end;
 parse_string(#{data := <<$\\, _, _/binary>>, position := Position}, _Acc) ->
   throw({error, #{reason => invalid_escape_sequence,
@@ -159,8 +159,9 @@ parse_string(#{data := <<$\\, _, _/binary>>, position := Position}, _Acc) ->
 parse_string(#{data := <<$\\>>, position := Position}, _Acc) ->
   throw({error, #{reason => truncated_escape_sequence,
                   position => Position}});
-parse_string(P = #{data := <<C, _/binary>>}, Acc) ->
-  parse_string(skip1(P), <<Acc/binary, C>>).
+parse_string(P = #{data := (Data = <<C/utf8, Rest/binary>>)}, Acc) ->
+  N = byte_size(Data) - byte_size(Rest),
+  parse_string(skip(P, N), <<Acc/binary, C/utf8>>).
 
 -spec parse_unicode_escape_sequence(parser()) -> {integer(), parser()}.
 parse_unicode_escape_sequence(P = #{data := <<$\\, C, HexCode:4/binary,
