@@ -14,7 +14,8 @@
 
 -module(json_pointer).
 
--export([parse/1, serialize/1, eval/2, eval_pointer/2]).
+-export([parent/1, child/2,
+         parse/1, serialize/1, eval/2, eval_pointer/2]).
 
 -export_type([pointer/0, reference_token/0]).
 
@@ -26,6 +27,19 @@
                       | {invalid_escape_sequence, binary()}
                       | {invalid_pointer, binary(), json:value()}
                       | {invalid_array_index, reference_token() | integer()}.
+
+-spec parent(pointer()) -> pointer().
+parent([]) ->
+  error(badarg);
+parent(Pointer) ->
+  lists:droplast(Pointer).
+
+-spec child(pointer(), reference_token() | [reference_token()]) ->
+        pointer().
+child(Pointer, Tokens) when is_list(Tokens) ->
+  Pointer ++ Tokens;
+child(Pointer, Token) ->
+  Pointer ++ [Token].
 
 -spec parse(binary()) -> {ok, pointer()} | {error, error_reason()}.
 parse(<<>>) ->

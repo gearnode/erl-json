@@ -1,6 +1,8 @@
 % erl-json changelog
 
 # Next Version
+## Features
+- Add `json_pointer:parent/1` and `json_pointer:child/2`.
 
 # 1.1.0
 ## Features

@@ -16,6 +16,21 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+parent_test_() ->
+  Parent = fun json_pointer:parent/1,
+  [?_assertEqual([], Parent([<<"a">>])),
+   ?_assertEqual([<<"a">>], Parent([<<"a">>, <<"b">>])),
+   ?_assertEqual([<<"a">>, <<"b">>], Parent([<<"a">>, <<"b">>, <<"c">>]))].
+
+child_test_() ->
+  Child = fun json_pointer:child/2,
+  [?_assertEqual([<<"a">>], Child([], <<"a">>)),
+   ?_assertEqual([<<"a">>], Child([<<"a">>], [])),
+   ?_assertEqual([<<"a">>, <<"b">>], Child([], [<<"a">>, <<"b">>])),
+   ?_assertEqual([<<"a">>, <<"b">>], Child([<<"a">>], <<"b">>)),
+   ?_assertEqual([<<"a">>, <<"b">>, <<"c">>],
+                 Child([<<"a">>], [<<"b">>, <<"c">>]))].
+
 parse_test_() ->
   Parse = fun json_pointer:parse/1,
   [?_assertEqual({ok, []},
