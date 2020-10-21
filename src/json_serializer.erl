@@ -15,7 +15,8 @@
 -module(json_serializer).
 
 -export([serialize/2,
-         serialize_data/1]).
+         serialize_data/1,
+         serialize_date/1, serialize_time/1, serialize_datetime/1]).
 
 -spec serialize(json:value(), json:serialization_options()) -> iodata().
 serialize(Value, Options0) ->
@@ -94,3 +95,27 @@ escape(<<C/utf8, S/binary>>, Options, Acc) ->
 -spec serialize_data(iodata()) -> {data, iodata()}.
 serialize_data(Data) ->
   {data, Data}.
+
+-spec serialize_date(calendar:date()) -> {value, binary()}.
+serialize_date(Date) ->
+  {value, format_date(Date)}.
+
+-spec serialize_time(calendar:time()) -> {value, binary()}.
+serialize_time(Time) ->
+  {value, format_time(Time)}.
+
+-spec serialize_datetime(calendar:datetime()) -> {value, binary()}.
+serialize_datetime(Datetime) ->
+  {value, format_datetime(Datetime)}.
+
+-spec format_date(calendar:date()) -> binary().
+format_date({Y, M, D}) ->
+  iolist_to_binary(io_lib:format(<<"~4..0b-~2..0b-~2..0b">>, [Y, M, D])).
+
+-spec format_time(calendar:time()) -> binary().
+format_time({H, M, S}) ->
+  iolist_to_binary(io_lib:format(<<"~2..0b:~2..0b:~2..0b">>, [H, M, S])).
+
+-spec format_datetime(calendar:datetime()) -> binary().
+format_datetime({Date, Time}) ->
+  iolist_to_binary([format_date(Date), $T, format_time(Time), $Z]).

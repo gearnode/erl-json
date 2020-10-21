@@ -70,7 +70,10 @@
 
 -spec default_serializers() -> serializers().
 default_serializers() ->
-  #{data => fun json_serializer:serialize_data/1}.
+  #{data => fun json_serializer:serialize_data/1,
+    date => fun json_serializer:serialize_date/1,
+    time => fun json_serializer:serialize_time/1,
+    datetime => fun json_serializer:serialize_datetime/1}.
 
 -spec parse(binary()) -> {ok, value()} | {error, term()}.
 parse(Data) ->

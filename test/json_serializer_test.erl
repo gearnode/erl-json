@@ -96,6 +96,16 @@ serializers_data_test_() ->
   [?_assertEqual(<<"42">>, serialize({data, <<"42">>})),
    ?_assertEqual(<<"[1,2,3]">>, serialize({data, <<"[1,2,3]">>}))].
 
+serializers_date_test_() ->
+  [?_assertEqual(<<"\"2020-10-21\"">>, serialize({date, {2020, 10, 21}}))].
+
+serializers_time_test_() ->
+  [?_assertEqual(<<"\"21:16:35\"">>, serialize({time, {21, 16, 35}}))].
+
+serializers_datetime_test_() ->
+  [?_assertEqual(<<"\"2020-10-21T21:16:35Z\"">>,
+                 serialize({datetime, {{2020, 10, 21}, {21, 16, 35}}}))].
+
 -spec serialize(json:value()) -> iodata().
 serialize(Data) ->
   serialize(Data, #{}).

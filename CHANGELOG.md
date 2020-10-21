@@ -3,6 +3,7 @@
 # Next Version
 ## Features
 - Add `json_pointer:parent/1` and `json_pointer:child/2`.
+- Add custom serializers for values of the form `{Type, Value}`.
 
 # 1.1.0
 ## Features

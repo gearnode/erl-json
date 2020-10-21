@@ -57,6 +57,16 @@ must return one of the following two values:
   transformation;
 - `{value, json:value()}`: the value is serialized as any other JSON value.
 
+### Default serializers
+The following serializers are available in the default serializer map:
+
+| Type       | Value type            | Description                  |
+| ----       | ----------            | -----------                  |
+| `data`     | `iodata()`            | Raw data.                    |
+| `date`     | `calendar:date()`     | RFC 3339 date string.        |
+| `time`     | `calendar:time()`     | RFC 3339 simple time string. |
+| `datetime` | `calendar:datetime()` | RFC 3339 datetime string.    |
+
 ### Options
 Serialization options are represented as a map. The following options are available:
 - `return_binary`: return the final document as a binary instead of an iodata
