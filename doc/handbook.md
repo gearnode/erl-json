@@ -43,10 +43,26 @@ For example, `json:serialize([1, 2, 3], #{return_binary => true})` returns
 Serialization functions will signal an error of the form `{invalid_value,
 Term}` if an Erlang term cannot be represented in JSON.
 
+## Serializers
+While serialization functions usually handle terms which map directly to JSON
+values, they also accept terms of the form `{Type, Value}`. To serialize
+`Value`, the serializer looks for a serialization function associated with the
+`Type` atom in a map containing all serializers. The map returned by
+`json:default_serializers()` is used by default; a different map can be
+provided with the `serializers` serialization option.
+
+A serialization function takes a single argument, the value to serialize, and
+must return one of the following two values:
+- `{data, iodata()}`: data are inserted in the output document without any
+  transformation;
+- `{value, json:value()}`: the value is serialized as any other JSON value.
+
 ### Options
 Serialization options are represented as a map. The following options are available:
 - `return_binary`: return the final document as a binary instead of an iodata
   value.
+- `serializers`: a map associating types (as atoms) and serialization
+  functions to be used as a replacement for the default serializer map.
 
 ## JSON Pointer
 The `json_pointer:apply/2` function is used to parse a JSON Pointer string and

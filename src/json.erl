@@ -14,20 +14,23 @@
 
 -module(json).
 
--export([parse/1, parse/2, serialize/1, serialize/2]).
+-export([parse/1, parse/2, serialize/1, serialize/2,
+         default_serializers/0]).
 
 -export_type([value/0,
               error/0, error_reason/0,
               position/0,
               parsing_options/0, duplicate_key_handling/0,
-              serialization_options/0]).
+              serialization_options/0,
+              serialization_fun/0, serializers/0]).
 
 -type value() :: null
                | true | false
                | number()
                | binary()
                | [value()]
-               | #{binary() := value()}.
+               | #{binary() := value()}
+               | {atom(), term()}.
 
 -type error() :: #{reason => term(),
                    position => position()}.
@@ -58,7 +61,16 @@
 
 -type duplicate_key_handling() :: first | last | error.
 
--type serialization_options() :: #{return_binary => boolean()}.
+-type serialization_options() :: #{return_binary => boolean(),
+                                   serializers => serializers()}.
+
+-type serialization_fun() ::
+        fun((term()) -> {data, iodata()} | {value, json:value()}).
+-type serializers() :: #{atom() := serialization_fun()}.
+
+-spec default_serializers() -> serializers().
+default_serializers() ->
+  #{data => fun json_serializer:serialize_data/1}.
 
 -spec parse(binary()) -> {ok, value()} | {error, term()}.
 parse(Data) ->

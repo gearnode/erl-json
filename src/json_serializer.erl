@@ -14,10 +14,13 @@
 
 -module(json_serializer).
 
--export([serialize/2]).
+-export([serialize/2,
+         serialize_data/1]).
 
 -spec serialize(json:value(), json:serialization_options()) -> iodata().
-serialize(Value, Options) ->
+serialize(Value, Options0) ->
+  Serializers = maps:get(serializers, Options0, json:default_serializers()),
+  Options = Options0#{serializers => Serializers},
   Data = serialize1(Value, Options),
   case maps:get(return_binary, Options, false) of
     true ->
@@ -48,6 +51,20 @@ serialize1(Value, Options) when is_map(Value) ->
       end,
   Members = lists:reverse(maps:fold(F, [], Value)),
   [${, lists:join(<<", ">>, Members), $}];
+serialize1({Type, Value}, Options = #{serializers := Serializers}) ->
+  case maps:find(Type, Serializers) of
+    {ok, Serialize} ->
+      case Serialize(Value) of
+        {data, Data} ->
+          Data;
+        {value, Value2} ->
+          serialize1(Value2, Options)
+      end;
+    error ->
+      error({unknown_type, Type})
+  end;
+serialize1({Type, _}, _Options) ->
+  error({unknown_type, Type});
 serialize1(Value, _Options) ->
   error({invalid_value, Value}).
 
@@ -73,3 +90,7 @@ escape(<<C/utf8, S/binary>>, Options, Acc) when C =< 16#1f ->
   escape(S, Options, <<Acc/binary, CData/binary>>);
 escape(<<C/utf8, S/binary>>, Options, Acc) ->
   escape(S, Options, <<Acc/binary, C/utf8>>).
+
+-spec serialize_data(iodata()) -> {data, iodata()}.
+serialize_data(Data) ->
+  {data, Data}.

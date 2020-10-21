@@ -92,7 +92,10 @@ serialize_invalid_test_() ->
    ?_assertError({invalid_value, foo},
                  serialize([foo]))].
 
--spec serialize(binary()) -> {ok, json:value()} | {error, term()}.
+serializers_data_test_() ->
+  [?_assertEqual(<<"42">>, serialize({data, <<"42">>})),
+   ?_assertEqual(<<"[1,2,3]">>, serialize({data, <<"[1,2,3]">>}))].
+
 -spec serialize(json:value()) -> iodata().
 serialize(Data) ->
   serialize(Data, #{}).
