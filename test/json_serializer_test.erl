@@ -93,10 +93,11 @@ serialize_invalid_test_() ->
                  serialize([foo]))].
 
 -spec serialize(binary()) -> {ok, json:value()} | {error, term()}.
+-spec serialize(json:value()) -> iodata().
 serialize(Data) ->
   serialize(Data, #{}).
 
--spec serialize(binary() , json:serialization_options()) -> iodata().
+-spec serialize(json:value() , json:serialization_options()) -> iodata().
 serialize(Data, Options) ->
   Options2 = maps:merge(Options, #{return_binary => true}),
   json_serializer:serialize(Data, Options2).

@@ -69,10 +69,10 @@ parse(Data) ->
 parse(Data, Options) ->
   json_parser:parse(Data, Options).
 
--spec serialize(binary()) -> iodata().
+-spec serialize(value()) -> iodata().
 serialize(Data) ->
   serialize(Data, #{}).
 
--spec serialize(binary(), serialization_options()) -> iodata().
+-spec serialize(value(), serialization_options()) -> iodata().
 serialize(Data, Options) ->
   json_serializer:serialize(Data, Options).
