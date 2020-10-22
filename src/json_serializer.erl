@@ -48,7 +48,7 @@ serialize1(Value, Options) when is_list(Value) ->
   [$[, lists:join(<<", ">>, lists:map(F, Value)), $]];
 serialize1(Value, Options) when is_map(Value) ->
   F = fun (K, V, Acc) ->
-          [[serialize1(K, Options), $:, $\s, serialize1(V, Options)] | Acc]
+          [[serialize_key(K, Options), $:, $\s, serialize1(V, Options)] | Acc]
       end,
   Members = lists:reverse(maps:fold(F, [], Value)),
   [${, lists:join(<<", ">>, Members), $}];
@@ -68,6 +68,12 @@ serialize1({Type, _}, _Options) ->
   error({unknown_type, Type});
 serialize1(Value, _Options) ->
   error({invalid_value, Value}).
+
+-spec serialize_key(json:key(), json:serialization_options()) -> iodata().
+serialize_key(Key, Options) when is_atom(Key) ->
+  serialize_key(atom_to_binary(Key), Options);
+serialize_key(Key, Options) ->
+  serialize1(unicode:characters_to_binary(Key), Options).
 
 -spec escape(binary(), json:serialization_options(), Acc :: binary()) ->
         binary().

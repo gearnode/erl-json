@@ -84,7 +84,11 @@ serialize_objects_test_() ->
    ?_assertEqual(<<"{\"a\": 1, \"bcd\": [2, 3]}">>,
                  serialize(#{<<"a">> => 1, <<"bcd">> => [2, 3]})),
    ?_assertEqual(<<"{\"a\": {}, \"b\": {\"c\": []}}">>,
-                 serialize(#{<<"a">> => #{}, <<"b">> => #{<<"c">> => []}}))].
+                 serialize(#{<<"a">> => #{}, <<"b">> => #{<<"c">> => []}})),
+   ?_assertEqual(<<"{\"a\": 1, \"fooBar\": 2}">>,
+                 serialize(#{a => 1, 'fooBar' => 2})),
+   ?_assertEqual(<<"{\"a\": 1, \"fooBar\": 2}">>,
+                 serialize(#{"a" => 1, "fooBar" => 2}))].
 
 serialize_invalid_test_() ->
   [?_assertError({invalid_value, {}},

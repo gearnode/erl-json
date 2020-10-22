@@ -17,7 +17,7 @@
 -export([parse/1, parse/2, serialize/1, serialize/2,
          default_serializers/0]).
 
--export_type([value/0,
+-export_type([value/0, key/0,
               error/0, error_reason/0,
               position/0,
               parsing_options/0, duplicate_key_handling/0,
@@ -29,8 +29,10 @@
                | number()
                | binary()
                | [value()]
-               | #{binary() := value()}
+               | #{key() := value()}
                | {atom(), term()}.
+
+-type key() :: binary() | string() | atom().
 
 -type error() :: #{reason => term(),
                    position => position()}.
