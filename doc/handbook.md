@@ -96,3 +96,8 @@ JSON values and Erlang terms are mapped according to the following table:
 | string     | `binary()`                    |
 | array      | `[json:value()]`              |
 | object     | `#{binary() := json:value()}` |
+
+As an exception, the serializer accepts not only binaries but strings and
+atoms as object keys, for convenience purposes. The parser will always return
+object keys as binaries. Erlang terms of type `json:value()` used for anything
+but direct serialization must use binaries for object keys.
