@@ -25,8 +25,8 @@
 -type error_reason() :: invalid_format
                       | truncated_escape_sequence
                       | {invalid_escape_sequence, binary()}
-                      | {invalid_pointer, binary(), json:value()}
-                      | {invalid_array_index, reference_token() | integer()}.
+                      | invalid_pointer
+                      | {invalid_array_index, reference_token()}.
 
 -spec parent(pointer()) -> pointer().
 parent([]) ->
@@ -104,28 +104,26 @@ eval(Data, Value) ->
                   -> {ok, json:value()} | {error, error_reason()}.
 eval_pointer([], Value) ->
   {ok, Value};
-eval_pointer(Pointer = [Token | Tokens], Value) when is_map(Value) ->
+eval_pointer([Token | Tokens], Value) when is_map(Value) ->
   case maps:find(Token, Value) of
     {ok, Child} ->
       eval_pointer(Tokens, Child);
     error ->
-      {error, {invalid_pointer, serialize(Pointer), Value}}
+      {error, invalid_pointer}
   end;
-eval_pointer(Pointer = [<<"-">> | _], Value) when is_list(Value) ->
-  {error, {invalid_pointer, serialize(Pointer), Value}};
-eval_pointer(Pointer = [Token | Tokens], Value) when is_list(Value) ->
+eval_pointer([<<"-">> | _], Value) when is_list(Value) ->
+  {error, invalid_pointer};
+eval_pointer([Token | Tokens], Value) when is_list(Value) ->
   try
     binary_to_integer(Token)
   of
     I when I >= 0, I < length(Value) ->
       eval_pointer(Tokens, lists:nth(I+1, Value));
-    I when I >= 0 ->
-      {error, {invalid_pointer, serialize(Pointer), Value}};
-    I ->
-      {error, {invalid_array_index, I}}
+    _ ->
+      {error, invalid_pointer}
   catch
     error:badarg ->
       {error, {invalid_array_index, Token}}
   end;
-eval_pointer(Pointer, Value) ->
-  {error, {invalid_pointer, serialize(Pointer), Value}}.
+eval_pointer(_Pointer, _Value) ->
+  {error, invalid_pointer}.
