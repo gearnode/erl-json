@@ -6,8 +6,9 @@ The project currently supports:
 
 - Parsing and serialization of JSON data as specified by [RFC
   8259](https://tools.ietf.org/html/rfc8259).
-- JSON Pointer application as specified by [RFC
+- JSON Pointer as specified by [RFC
   6901](https://tools.ietf.org/html/rfc6901).
+- JSON Patch as specified by [RFC 6902](https://tools.ietf.org/html/rfc6902).
 
 # Documentation
 A handbook is available [in the `doc`

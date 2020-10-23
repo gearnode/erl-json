@@ -75,8 +75,8 @@ Serialization options are represented as a map. The following options are availa
   functions to be used as a replacement for the default serializer map.
 
 ## JSON Pointer
-The `json_pointer:apply/2` function is used to parse a JSON Pointer string and
-to apply it to a JSON value.
+The `json_pointer:eval/2` function is used to obtain the value referenced by a
+JSON pointer inside a JSON value.
 
 Example:
 ```erlang

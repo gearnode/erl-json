@@ -15,7 +15,7 @@
 -module(json_pointer).
 
 -export([parent/1, child/2,
-         parse/1, serialize/1, eval/2, eval_pointer/2]).
+         parse/1, serialize/1, eval/2]).
 
 -export_type([pointer/0, reference_token/0]).
 
@@ -90,40 +90,37 @@ serialize_reference_token(<<$~, Token/binary>>, Acc) ->
 serialize_reference_token(<<C, Token/binary>>, Acc) ->
   serialize_reference_token(Token, <<Acc/binary, C>>).
 
--spec eval(binary(), json:value())
-          -> {ok, json:value()} | {error, error_reason()}.
-eval(Data, Value) ->
-  case parse(Data) of
+-spec eval(pointer(), json:value())
+                  -> {ok, json:value()} | {error, error_reason()}.
+eval(PointerString, Value) when is_binary(PointerString) ->
+  case parse(PointerString) of
     {ok, Pointer} ->
-      eval_pointer(Pointer, Value);
+      eval(Pointer, Value);
     {error, Reason} ->
       {error, Reason}
-  end.
-
--spec eval_pointer(pointer(), json:value())
-                  -> {ok, json:value()} | {error, error_reason()}.
-eval_pointer([], Value) ->
+  end;
+eval([], Value) ->
   {ok, Value};
-eval_pointer([Token | Tokens], Value) when is_map(Value) ->
+eval([Token | Tokens], Value) when is_map(Value) ->
   case maps:find(Token, Value) of
     {ok, Child} ->
-      eval_pointer(Tokens, Child);
+      eval(Tokens, Child);
     error ->
       {error, invalid_pointer}
   end;
-eval_pointer([<<"-">> | _], Value) when is_list(Value) ->
+eval([<<"-">> | _], Value) when is_list(Value) ->
   {error, invalid_pointer};
-eval_pointer([Token | Tokens], Value) when is_list(Value) ->
+eval([Token | Tokens], Value) when is_list(Value) ->
   try
     binary_to_integer(Token)
   of
     I when I >= 0, I < length(Value) ->
-      eval_pointer(Tokens, lists:nth(I+1, Value));
+      eval(Tokens, lists:nth(I+1, Value));
     _ ->
       {error, invalid_pointer}
   catch
     error:badarg ->
       {error, {invalid_array_index, Token}}
   end;
-eval_pointer(_Pointer, _Value) ->
+eval(_Pointer, _Value) ->
   {error, invalid_pointer}.
