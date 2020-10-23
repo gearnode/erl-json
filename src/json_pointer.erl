@@ -17,16 +17,21 @@
 -export([parent/1, child/2,
          parse/1, serialize/1, eval/2]).
 
--export_type([pointer/0, reference_token/0]).
+-export_type([pointer/0, reference_token/0,
+              error_reason/0,
+              parsing_error_reason/0, evaluation_error_reason/0]).
 
 -type pointer() :: [reference_token()].
 -type reference_token() :: binary().
 
--type error_reason() :: invalid_format
-                      | truncated_escape_sequence
-                      | {invalid_escape_sequence, binary()}
-                      | invalid_pointer
-                      | {invalid_array_index, reference_token()}.
+-type error_reason() :: parsing_error_reason() | evaluation_error_reason().
+
+-type parsing_error_reason() :: invalid_format
+                              | truncated_escape_sequence
+                              | {invalid_escape_sequence, binary()}.
+
+-type evaluation_error_reason() :: invalid_pointer
+                                 | {invalid_array_index, reference_token()}.
 
 -spec parent(pointer()) -> pointer().
 parent([]) ->
@@ -41,7 +46,7 @@ child(Pointer, Tokens) when is_list(Tokens) ->
 child(Pointer, Token) ->
   Pointer ++ [Token].
 
--spec parse(binary()) -> {ok, pointer()} | {error, error_reason()}.
+-spec parse(binary()) -> {ok, pointer()} | {error, parsing_error_reason()}.
 parse(<<>>) ->
   {ok, []};
 parse(<<$/, Data/binary>>) ->
@@ -90,7 +95,7 @@ serialize_reference_token(<<$~, Token/binary>>, Acc) ->
 serialize_reference_token(<<C, Token/binary>>, Acc) ->
   serialize_reference_token(Token, <<Acc/binary, C>>).
 
--spec eval(pointer(), json:value())
+-spec eval(binary() | pointer(), json:value())
                   -> {ok, json:value()} | {error, error_reason()}.
 eval(PointerString, Value) when is_binary(PointerString) ->
   case parse(PointerString) of
