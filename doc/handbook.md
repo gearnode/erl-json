@@ -75,12 +75,12 @@ Serialization options are represented as a map. The following options are availa
   functions to be used as a replacement for the default serializer map.
 
 ## JSON Pointer
-The `json_pointer:eval/2` function is used to obtain the value referenced by a
+The `json_pointer:find/2` function is used to obtain the value referenced by a
 JSON pointer inside a JSON value.
 
 Example:
 ```erlang
-json_pointer:eval(<<"/foo/2">>,
+json_pointer:find(<<"/foo/2">>,
                   #{<<"foo">> => [1, 2, 3],
                     <<"bar">> => [4, 5]}).
 ```
