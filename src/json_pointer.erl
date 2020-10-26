@@ -137,7 +137,7 @@ find([Token | Tokens], Value) when is_list(Value) ->
 find(_Pointer, _Value) ->
   {error, invalid_pointer}.
 
--spec insert(pointer(), json:value(), NewValue :: json:value()) ->
+-spec insert(pointer() | binary(), json:value(), NewValue :: json:value()) ->
         json:value().
 insert(Pointer, Value, NewValue) ->
   F = fun
@@ -153,7 +153,7 @@ insert(Pointer, Value, NewValue) ->
       end,
   update(Pointer, Value, F).
 
--spec replace(pointer(), json:value(), NewValue :: json:value()) ->
+-spec replace(pointer() | binary(), json:value(), NewValue :: json:value()) ->
         json:value().
 replace(Pointer, Value, NewValue) ->
   F = fun
@@ -169,7 +169,7 @@ replace(Pointer, Value, NewValue) ->
       end,
   update(Pointer, Value, F).
 
--spec remove(pointer(), json:value()) -> json:value().
+-spec remove(pointer() | binary(), json:value()) -> json:value().
 remove(Pointer, Value) ->
   F = fun
         ({root, _}) ->
