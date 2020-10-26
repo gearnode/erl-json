@@ -15,7 +15,7 @@
 -module(json_pointer).
 
 -export([parent/1, child/2,
-         parse/1, serialize/1, find/2, insert/3, replace/3]).
+         parse/1, serialize/1, find/2, insert/3, replace/3, remove/2]).
 
 -export_type([pointer/0, reference_token/0,
               error_reason/0,
@@ -164,6 +164,21 @@ replace(Pointer, Value, NewValue) ->
         ({array, Parent, I}) ->
           {Before, [_ | After]} = lists:split(I, Parent),
           Before ++ [NewValue | After];
+        ({array_end, _}) ->
+          throw({error, invalid_pointer})
+      end,
+  update(Pointer, Value, F).
+
+-spec remove(pointer(), json:value()) -> json:value().
+remove(Pointer, Value) ->
+  F = fun
+        ({root, _}) ->
+          throw({error, invalid_pointer});
+        ({object, Parent, Key}) ->
+          maps:remove(Key, Parent);
+        ({array, Parent, I}) ->
+          {Before, [_ | After]} = lists:split(I, Parent),
+          Before ++ After;
         ({array_end, _}) ->
           throw({error, invalid_pointer})
       end,
