@@ -137,6 +137,38 @@ find([Token | Tokens], Value) when is_list(Value) ->
 find(_Pointer, _Value) ->
   {error, invalid_pointer}.
 
+-spec insert(pointer(), json:value(), NewValue :: json:value()) ->
+        json:value().
+insert(Pointer, Value, NewValue) ->
+  F = fun
+        ({root, _}) ->
+          NewValue;
+        ({object, Parent, Key}) ->
+          Parent#{Key => NewValue};
+        ({array, Parent, I}) ->
+          {Before, After} = lists:split(I, Parent),
+          Before ++ [NewValue] ++ After;
+        ({array_end, Parent}) ->
+          Parent ++ [NewValue]
+      end,
+  update(Pointer, Value, F).
+
+-spec replace(pointer(), json:value(), NewValue :: json:value()) ->
+        json:value().
+replace(Pointer, Value, NewValue) ->
+  F = fun
+        ({root, _}) ->
+          NewValue;
+        ({object, Parent, Key}) ->
+          Parent#{Key => NewValue};
+        ({array, Parent, I}) ->
+          {Before, [_ | After]} = lists:split(I, Parent),
+          Before ++ [NewValue | After];
+        ({array_end, _}) ->
+          throw({error, invalid_pointer})
+      end,
+  update(Pointer, Value, F).
+
 -spec update(binary() | pointer(), json:value(), update_fun())
             -> {ok, json:value()} | {error, error_reason()}.
 update(PointerString, Value, F) when is_binary(PointerString) ->
@@ -198,35 +230,3 @@ do_update([Token | Tokens], Value, F) when is_list(Value) ->
   end;
 do_update(_Pointer, _Value, _F) ->
   throw({error, invalid_pointer}).
-
--spec insert(pointer(), json:value(), NewValue :: json:value()) ->
-        json:value().
-insert(Pointer, Value, NewValue) ->
-  F = fun
-        ({root, _}) ->
-          NewValue;
-        ({object, Parent, Key}) ->
-          Parent#{Key => NewValue};
-        ({array, Parent, I}) ->
-          {Before, After} = lists:split(I, Parent),
-          Before ++ [NewValue] ++ After;
-        ({array_end, Parent}) ->
-          Parent ++ [NewValue]
-      end,
-  update(Pointer, Value, F).
-
--spec replace(pointer(), json:value(), NewValue :: json:value()) ->
-        json:value().
-replace(Pointer, Value, NewValue) ->
-  F = fun
-        ({root, _}) ->
-          NewValue;
-        ({object, Parent, Key}) ->
-          Parent#{Key => NewValue};
-        ({array, Parent, I}) ->
-          {Before, [_ | After]} = lists:split(I, Parent),
-          Before ++ [NewValue | After];
-        ({array_end, _}) ->
-          throw({error, invalid_pointer})
-      end,
-  update(Pointer, Value, F).
