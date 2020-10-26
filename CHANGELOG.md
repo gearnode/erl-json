@@ -1,6 +1,8 @@
 % erl-json changelog
 
 # Next Version
+
+# 1.2.0
 ## Features
 - Add `json_pointer:parent/1` and `json_pointer:child/2`.
 - Add custom serializers for values of the form `{Type, Value}`.
