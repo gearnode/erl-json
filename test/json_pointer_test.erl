@@ -222,7 +222,7 @@ remove_test_() ->
                  Remove(<<"/a">>, #{<<"a">> => 42})),
    ?_assertEqual({ok, #{<<"a">> => #{}}},
                  Remove(<<"/a/b">>, #{<<"a">> => #{<<"b">> => 42}})),
-   ?_assertEqual({ok, #{<<"a">> => #{<<"c">> => 1}}},
+   ?_assertEqual({error, invalid_pointer},
                  Remove(<<"/a/b">>, #{<<"a">> => #{<<"c">> => 1}})),
    ?_assertEqual({error, invalid_pointer},
                  Remove(<<"/2">>, [])),

@@ -175,7 +175,12 @@ remove(Pointer, Value) ->
         ({root, _}) ->
           throw({error, invalid_pointer});
         ({object, Parent, Key}) ->
-          maps:remove(Key, Parent);
+          case maps:is_key(Key, Parent) of
+            true ->
+              maps:remove(Key, Parent);
+            false ->
+              throw({error, invalid_pointer})
+          end;
         ({array, Parent, I}) ->
           {Before, [_ | After]} = lists:split(I, Parent),
           Before ++ After;
