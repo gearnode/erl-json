@@ -9,6 +9,7 @@
   `json_pointer:find/2`, `json_pointer:insert/2` and
   `json_pointer:replace/2`. These three functions accept both a binary JSON
   pointer or a parsed JSON pointer.
+- Introduce support for JSON Patch.
 
 # 1.1.0
 ## Features

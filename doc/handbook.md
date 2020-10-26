@@ -85,6 +85,13 @@ json_pointer:find(<<"/foo/2">>,
                     <<"bar">> => [4, 5]}).
 ```
 
+## JSON Patch
+The `json_patch:parse/1` function is used to to parse a patch made of a
+sequence of JSON Patch operations from a list of JSON values.
+
+The `json_patch:execute/2` function is then used to apply a patch to any JSON
+value.
+
 # Types
 JSON values and Erlang terms are mapped according to the following table:
 
