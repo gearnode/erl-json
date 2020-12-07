@@ -45,13 +45,13 @@ serialize1(Value, Options) when is_binary(Value) ->
   [$", escape(Value, Options, <<>>), $"];
 serialize1(Value, Options) when is_list(Value) ->
   F = fun (V) -> serialize(V, Options) end,
-  [$[, lists:join(<<", ">>, lists:map(F, Value)), $]];
+  [$[, lists:join($,, lists:map(F, Value)), $]];
 serialize1(Value, Options) when is_map(Value) ->
   F = fun (K, V, Acc) ->
-          [[serialize_key(K, Options), $:, $\s, serialize1(V, Options)] | Acc]
+          [[serialize_key(K, Options), $:, serialize1(V, Options)] | Acc]
       end,
   Members = lists:reverse(maps:fold(F, [], Value)),
-  [${, lists:join(<<", ">>, Members), $}];
+  [${, lists:join($,, Members), $}];
 serialize1({Type, Value}, Options = #{serializers := Serializers}) ->
   case maps:find(Type, Serializers) of
     {ok, Serialize} ->

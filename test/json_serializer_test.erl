@@ -71,23 +71,23 @@ serialize_strings_test_() ->
 serialize_arrays_test_() ->
   [?_assertEqual(<<"[]">>,
                  serialize([])),
-   ?_assertEqual(<<"[1, 2, 3]">>,
+   ?_assertEqual(<<"[1,2,3]">>,
                  serialize([1, 2, 3])),
-   ?_assertEqual(<<"[[], [1], [2, 3]]">>,
+   ?_assertEqual(<<"[[],[1],[2,3]]">>,
                  serialize([[], [1], [2, 3]]))].
 
 serialize_objects_test_() ->
   [?_assertEqual(<<"{}">>,
                  serialize(#{})),
-   ?_assertEqual(<<"{\"a\": 1}">>,
+   ?_assertEqual(<<"{\"a\":1}">>,
                  serialize(#{<<"a">> => 1})),
-   ?_assertEqual(<<"{\"a\": 1, \"bcd\": [2, 3]}">>,
+   ?_assertEqual(<<"{\"a\":1,\"bcd\":[2,3]}">>,
                  serialize(#{<<"a">> => 1, <<"bcd">> => [2, 3]})),
-   ?_assertEqual(<<"{\"a\": {}, \"b\": {\"c\": []}}">>,
+   ?_assertEqual(<<"{\"a\":{},\"b\":{\"c\":[]}}">>,
                  serialize(#{<<"a">> => #{}, <<"b">> => #{<<"c">> => []}})),
-   ?_assertEqual(<<"{\"a\": 1, \"fooBar\": 2}">>,
+   ?_assertEqual(<<"{\"a\":1,\"fooBar\":2}">>,
                  serialize(#{a => 1, 'fooBar' => 2})),
-   ?_assertEqual(<<"{\"a\": 1, \"fooBar\": 2}">>,
+   ?_assertEqual(<<"{\"a\":1,\"fooBar\":2}">>,
                  serialize(#{"a" => 1, "fooBar" => 2}))].
 
 serialize_invalid_test_() ->
