@@ -3,6 +3,8 @@
 # Next Version
 ## Features
 - Add the `json:array/0` and `json:object/0` types.
+## Misc
+- Remove the extra space before object values in the serializer.
 
 # 1.2.0
 ## Features
