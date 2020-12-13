@@ -1,6 +1,8 @@
 % erl-json changelog
 
 # Next Version
+## Features
+- Add the `json:array/0` and `json:object/0` types.
 
 # 1.2.0
 ## Features
