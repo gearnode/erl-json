@@ -28,6 +28,11 @@ new_parser(Data, Options) ->
     position => {1, 1},
     depth => 0}.
 
+-spec parser_error(parser(), term()) -> json:error().
+parser_error(#{position := Position}, Reason) ->
+  #{reason => Reason,
+    position => Position}.
+
 -spec parse(binary(), json:parsing_options()) ->
         {ok, json:value()} | {error, json:error()}.
 parse(Data, Options) ->
@@ -37,9 +42,8 @@ parse(Data, Options) ->
     case P2 of
       #{data := <<>>} ->
         {ok, Value};
-      #{data := TrailingData, position := Position} ->
-        {error, #{reason => {unexpected_trailing_data, TrailingData},
-                  position => Position}}
+      #{data := TrailingData} ->
+        {error, parser_error(P2, {unexpected_trailing_data, TrailingData})}
     end
   catch
     throw:{error, Error} ->
@@ -59,19 +63,15 @@ parse_value(Data, Options) ->
   end.
 
 -spec parse1(parser()) -> {json:value(), parser()}.
-parse1(#{options := #{depth_limit := DepthLimit},
-         position := Position,
-         depth := Depth}) when
+parse1(P = #{options := #{depth_limit := DepthLimit}, depth := Depth}) when
     Depth > DepthLimit ->
-  throw({error, #{reason => depth_limit_reached,
-                  position => Position}});
+  throw({error, parser_error(P, depth_limit_reached)});
 parse1(P0) ->
   P = skip_whitespace(P0),
   {Value, P2} =
     case P of
-      #{data := <<>>, position := Position} ->
-        throw({error, #{reason => no_value,
-                        position => Position}});
+      #{data := <<>>} ->
+        throw({error, parser_error(P, no_value)});
       #{data := <<$n, _/binary>>} ->
         parse_null(P);
       #{data := <<$t, _/binary>>} ->
@@ -86,44 +86,38 @@ parse1(P0) ->
         parse_object(P);
       #{data := <<C, _/binary>>} when C =:= $-; C >= $0, C =< $9 ->
         parse_number(P);
-      #{data := <<C, _/binary>>, position := Position} ->
-        throw({error, #{reason => {unexpected_character, C},
-                        position => Position}})
+      #{data := <<C, _/binary>>} ->
+        throw({error, parser_error(P, {unexpected_character, C})})
     end,
   {Value, skip_whitespace(P2)}.
 
 -spec parse_null(parser()) -> {null, parser()}.
 parse_null(P = #{data := <<"null", _/binary>>}) ->
   {null, skip(P, 4)};
-parse_null(#{position := Position}) ->
-  throw({error, #{reason => invalid_element,
-                  position => Position}}).
+parse_null(P) ->
+  throw({error, parser_error(P, invalid_element)}).
 
 -spec parse_true(parser()) -> {true, parser()}.
 parse_true(P = #{data := <<"true", _/binary>>}) ->
   {true, skip(P, 4)};
-parse_true(#{position := Position}) ->
-  throw({error, #{reason => invalid_element,
-                  position => Position}}).
+parse_true(P) ->
+  throw({error, parser_error(P, invalid_element)}).
 
 -spec parse_false(parser()) -> {false, parser()}.
 parse_false(P = #{data := <<"false", _/binary>>}) ->
   {false, skip(P, 5)};
-parse_false(#{position := Position}) ->
-  throw({error, #{reason => invalid_element,
-                  position => Position}}).
+parse_false(P) ->
+  throw({error, parser_error(P, invalid_element)}).
 
 -spec parse_string(parser()) -> {binary(), parser()}.
 parse_string(P = #{data := <<$", _/binary>>}) ->
   parse_string(skip1(P), <<>>);
-parse_string(#{position := Position}) ->
-  throw({error, #{reason => invalid_string,
-                  position => Position}}).
+parse_string(P) ->
+  throw({error, parser_error(P, invalid_string)}).
 
 -spec parse_string(parser(), Acc :: binary()) -> {binary(), parser()}.
-parse_string(#{data := <<>>, position := Position}, _Acc) ->
-  throw({error, #{reason => truncated_string,
-                  position => Position}});
+parse_string(P = #{data := <<>>}, _Acc) ->
+  throw({error, parser_error(P, truncated_string)});
 parse_string(P = #{data := <<$", _/binary>>}, Acc) ->
   {Acc, skip1(P)};
 parse_string(P = #{data := <<$\\, $", _/binary>>}, Acc) ->
@@ -153,56 +147,45 @@ parse_string(P = #{data := <<$\\, C, _/binary>>}, Acc) when
     true ->
       parse_string(P2, <<Acc/binary, Code1/utf8>>)
   end;
-parse_string(#{data := <<$\\, _, _/binary>>, position := Position}, _Acc) ->
-  throw({error, #{reason => invalid_escape_sequence,
-                  position => Position}});
-parse_string(#{data := <<$\\>>, position := Position}, _Acc) ->
-  throw({error, #{reason => truncated_escape_sequence,
-                  position => Position}});
+parse_string(P = #{data := <<$\\, _, _/binary>>}, _Acc) ->
+  throw({error, parser_error(P, invalid_escape_sequence)});
+parse_string(P = #{data := <<$\\>>}, _Acc) ->
+  throw({error, parser_error(P, truncated_escape_sequence)});
 parse_string(P = #{data := (Data = <<C/utf8, Rest/binary>>)}, Acc) ->
   N = byte_size(Data) - byte_size(Rest),
   parse_string(skip(P, N), <<Acc/binary, C/utf8>>).
 
 -spec parse_unicode_escape_sequence(parser()) -> {integer(), parser()}.
 parse_unicode_escape_sequence(P = #{data := <<$\\, C, HexCode:4/binary,
-                                              _/binary>>,
-                                    position := Position}) when
+                                              _/binary>>}) when
     C =:= $u; C =:= $U ->
   try
     Code = binary_to_integer(HexCode, 16),
     {Code, skip(P, 6)}
   catch error:badarg ->
-      throw({error, #{reason => invalid_escape_sequence,
-                      position => Position}})
+      throw({error, parser_error(P, invalid_escape_sequence)})
   end;
-parse_unicode_escape_sequence(#{data := <<$\\, C, _/binary>>,
-                                position := Position}) when
+parse_unicode_escape_sequence(P = #{data := <<$\\, C, _/binary>>}) when
     C =:= $u; C =:= $U ->
-  throw({error, #{reason => truncated_escape_sequence,
-                  position => Position}});
-parse_unicode_escape_sequence(#{data := <<$\\>>, position := Position}) ->
-  throw({error, #{reason => truncated_escape_sequence,
-                  position => Position}});
-parse_unicode_escape_sequence(#{position := Position}) ->
-  throw({error, #{reason => truncated_utf16_surrogate_pair,
-                  position => Position}}).
+  throw({error, parser_error(P, truncated_escape_sequence)});
+parse_unicode_escape_sequence(P = #{data := <<$\\>>}) ->
+  throw({error, parser_error(P, truncated_escape_sequence)});
+parse_unicode_escape_sequence(P) ->
+  throw({error, parser_error(P, truncated_utf16_surrogate_pair)}).
 
 -spec parse_array(parser()) -> {[json:value()], parser()}.
 parse_array(P = #{data := <<$[, _/binary>>, depth := Depth}) ->
   parse_array(skip_whitespace(skip1(P#{depth => Depth+1})), []);
-parse_array(#{position := Position}) ->
-  throw({error, #{reason => invalid_array,
-                  position => Position}}).
+parse_array(P) ->
+  throw({error, parser_error(P, invalid_array)}).
 
 -spec parse_array(parser(), Acc :: [json:value()]) ->
         {[json:value()], parser()}.
-parse_array(#{data := <<>>, position := Position}, _Acc) ->
-  throw({error, #{reason => truncated_array,
-                  position => Position}});
-parse_array(#{data := <<$], _/binary>>, position := Position}, Acc) when
+parse_array(P = #{data := <<>>}, _Acc) ->
+  throw({error, parser_error(P, truncated_array)});
+parse_array(P = #{data := <<$], _/binary>>}, Acc) when
     Acc =/= [] ->
-  throw({error, #{reason => {unexpected_character, $]},
-                  position => Position}});
+  throw({error, parser_error(P, {unexpected_character, $]})});
 parse_array(P = #{data := <<$], _/binary>>}, Acc) ->
   {lists:reverse(Acc), skip1(P)};
 parse_array(P, Acc) ->
@@ -211,33 +194,28 @@ parse_array(P, Acc) ->
       parse_array(skip_whitespace(skip1(P2)), [Value | Acc]);
     {Value, P2 = #{data := <<$], _/binary>>}} ->
       {lists:reverse([Value | Acc]), skip1(P2)};
-    {_, #{data := <<C, _/binary>>, position := Position}} ->
-      throw({error, #{reason => {unexpected_character, C},
-                      position => Position}});
-    {_, #{data := <<>>, position := Position}} ->
-      throw({error, #{reason => truncated_array,
-                      position => Position}})
+    {_, P2 = #{data := <<C, _/binary>>}} ->
+      throw({error, parser_error(P2, {unexpected_character, C})});
+    {_, P2 = #{data := <<>>}} ->
+      throw({error, parser_error(P2, truncated_array)})
   end.
 
 -spec parse_object(parser()) -> {#{binary() := json:value()}, parser()}.
 parse_object(P = #{data := <<${, _/binary>>, depth := Depth}) ->
   parse_object(skip_whitespace(skip1(P#{depth => Depth+1})), #{});
-parse_object(#{position := Position}) ->
-  throw({error, #{reason => invalid_object,
-                  position => Position}}).
+parse_object(P) ->
+  throw({error, parser_error(P, invalid_object)}).
 
 -spec parse_object(parser(), Acc :: #{binary() := json:value()}) ->
         {#{binary() := json:value()}, parser()}.
-parse_object(#{data := <<>>, position := Position}, _Acc) ->
-  throw({error, #{reason => truncated_object,
-                  position => Position}});
-parse_object(#{data := <<$}, _/binary>>, position := Position}, Acc) when
+parse_object(P = #{data := <<>>}, _Acc) ->
+  throw({error, parser_error(P, truncated_object)});
+parse_object(P = #{data := <<$}, _/binary>>}, Acc) when
     map_size(Acc) > 0 ->
-  throw({error, #{reason => {unexpected_character, $}},
-                  position => Position}});
+  throw({error, parser_error(P, {unexpected_character, $}})});
 parse_object(P = #{data := <<$}, _/binary>>}, Acc) ->
   {Acc, skip1(P)};
-parse_object(P = #{options := Options, position := Position}, Acc) ->
+parse_object(P = #{options := Options}, Acc) ->
   case parse_object_member(P) of
     {{Key, Value}, P2} when is_binary(Key) ->
       DuplicateKeyHandling = maps:get(duplicate_key_handling, Options, last),
@@ -247,8 +225,7 @@ parse_object(P = #{options := Options, position := Position}, Acc) ->
                {true, last} ->
                  Acc#{Key => Value};
                {true, error} ->
-                 throw({error, #{reason => {duplicate_key, Key},
-                                 position => Position}});
+                 throw({error, parser_error(P, {duplicate_key, Key})});
                {false, _} ->
                  Acc#{Key => Value}
              end,
@@ -257,16 +234,13 @@ parse_object(P = #{options := Options, position := Position}, Acc) ->
           parse_object(skip_whitespace(skip1(P3)), Acc2);
         P3 = #{data := <<$}, _/binary>>} ->
           {Acc2, skip1(P3)};
-        #{data := <<C, _/binary>>, position := Position2} ->
-          throw({error, #{reason => {unexpected_character, C},
-                          position => Position2}});
-        #{data := <<>>, position := Position2} ->
-          throw({error, #{reason => truncated_object,
-                          position => Position2}})
+        P3 = #{data := <<C, _/binary>>} ->
+          throw({error, parser_error(P3, {unexpected_character, C})});
+        P3 = #{data := <<>>} ->
+          throw({error, parser_error(P3, truncated_object)})
       end;
     {{Key, _}, _} ->
-      throw({error, #{reason => {invalid_key, Key},
-                      position => Position}})
+      throw({error, parser_error(P, {invalid_key, Key})})
   end.
 
 -spec parse_object_member(parser()) -> {{json:value(), json:value()}, parser()}.
@@ -274,22 +248,18 @@ parse_object_member(P) ->
   case parse1(P) of
     {Key, P2 = #{data := <<$:, _/binary>>}} ->
       case skip_whitespace(skip1(P2)) of
-        #{data := <<$}, _/binary>>, position := Position} ->
-          throw({error, #{reason => {unexpected_character, $}},
-                          position => Position}});
-        #{data := <<>>, position := Position} ->
-          throw({error, #{reason => truncated_object,
-                          position => Position}});
+        P3 = #{data := <<$}, _/binary>>} ->
+          throw({error, parser_error(P3, {unexpected_character, $}})});
+        P3 = #{data := <<>>} ->
+          throw({error, parser_error(P3, truncated_object)});
         P3 ->
           {Value, P4} = parse1(P3),
           {{Key, Value}, P4}
       end;
-    {_, #{data := <<C, _/binary>>, position := Position}} ->
-      throw({error, #{reason => {unexpected_character, C},
-                      position => Position}});
-    {_, #{data := <<>>, position := Position}} ->
-      throw({error, #{reason => truncated_object,
-                      position => Position}})
+    {_, P2 = #{data := <<C, _/binary>>}} ->
+      throw({error, parser_error(P2, {unexpected_character, C})});
+    {_, P2 = #{data := <<>>}} ->
+      throw({error, parser_error(P2, truncated_object)})
   end.
 
 -spec parse_number(parser()) -> {number(), parser()}.
@@ -318,11 +288,10 @@ parse_number(P = #{data := (Data = <<C, _/binary>>)}, integer_part,
     C >= $0, C =< $9 ->
   {I, Length} = parse_simple_integer(Data),
   parse_number(skip(P, Length), fractional_part, {S, {integer, I}, ES, E});
-parse_number(#{position := Position}, integer_part, _Acc) ->
-      throw({error, #{reason => invalid_number,
-                      position => Position}});
+parse_number(P, integer_part, _Acc) ->
+      throw({error, parser_error(P, invalid_number)});
 %% Fractional part
-parse_number(P = #{data := <<$., Data/binary>>, position := Position},
+parse_number(P = #{data := <<$., Data/binary>>},
              fractional_part, {S, B, ES, E}) ->
   case Data of
     <<C, _/binary>> when C >= $0, C =< $9 ->
@@ -334,8 +303,7 @@ parse_number(P = #{data := <<$., Data/binary>>, position := Position},
           end,
       parse_number(skip(P, Length+1), exponent, {S, {float, I + F}, ES, E});
     _ ->
-      throw({error, #{reason => invalid_number,
-                      position => Position}})
+      throw({error, parser_error(P, invalid_number)})
   end;
 parse_number(P, fractional_part, Acc) ->
   parse_number(P, exponent, Acc);
@@ -358,9 +326,8 @@ parse_number(P = #{data := (Data = <<C, _/binary>>)}, exponent_part,
     C >= $0, C =< $9 ->
   {E, Length} = parse_simple_integer(Data),
   parse_number(skip(P, Length), final, {S, B, ES, E});
-parse_number(#{position := Position}, exponent_part, _Acc) ->
-      throw({error, #{reason => invalid_number,
-                      position => Position}});
+parse_number(P, exponent_part, _Acc) ->
+      throw({error, parser_error(P, invalid_number)});
 %% Final state
 parse_number(P, final, {S, {integer, I}, _, undefined}) ->
   {S * I, P};
