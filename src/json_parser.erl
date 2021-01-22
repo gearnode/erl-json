@@ -18,20 +18,22 @@
 
 -type parser() :: #{options := json:parsing_options(),
                     data := binary(),
-                    position := json:position(),
+                    line := pos_integer(),
+                    column := pos_integer(),
                     depth := non_neg_integer()}.
 
 -spec new_parser(binary(), json:parsing_options()) -> parser().
 new_parser(Data, Options) ->
   #{options => Options,
     data => Data,
-    position => {1, 1},
+    line => 1,
+    column => 1,
     depth => 0}.
 
 -spec parser_error(parser(), term()) -> json:error().
-parser_error(#{position := Position}, Reason) ->
+parser_error(#{line := Line, column := Column}, Reason) ->
   #{reason => Reason,
-    position => Position}.
+    position => {Line, Column}}.
 
 -spec parse(binary(), json:parsing_options()) ->
         {ok, json:value()} | {error, json:error()}.
@@ -374,7 +376,7 @@ skip(P, N) ->
   skip(skip1(P), N-1).
 
 -spec skip1(parser()) -> parser().
-skip1(P = #{data := <<$\n, Data/binary>>, position := {Line, _}}) ->
-  P#{data => Data, position => {Line+1, 1}};
-skip1(P = #{data := <<_, Data/binary>>, position := {Line, Column}}) ->
-  P#{data => Data, position => {Line, Column+1}}.
+skip1(P = #{data := <<$\n, Data/binary>>, line := Line}) ->
+  P#{data => Data, line => Line+1, column => 0};
+skip1(P = #{data := <<_, Data/binary>>, column := Column}) ->
+  P#{data => Data, column => Column+1}.
