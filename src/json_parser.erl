@@ -153,10 +153,8 @@ parse_string(P = #{data := <<$\\, _, _/binary>>}, _Acc) ->
   throw({error, parser_error(P, invalid_escape_sequence)});
 parse_string(P = #{data := <<$\\>>}, _Acc) ->
   throw({error, parser_error(P, truncated_escape_sequence)});
-parse_string(P = #{data := (Data = <<C/utf8, Rest/binary>>),
-                   column := Column}, Acc) ->
-  N = byte_size(Data) - byte_size(Rest),
-  parse_string(P#{data => Rest, column => Column+N}, <<Acc/binary, C/utf8>>).
+parse_string(P = #{data := <<C/utf8, Data/binary>>, column := Column}, Acc) ->
+  parse_string(P#{data => Data, column => Column+1}, <<Acc/binary, C/utf8>>).
 
 -spec parse_unicode_escape_sequence(parser()) -> {integer(), parser()}.
 parse_unicode_escape_sequence(P = #{data := <<$\\, C, HexCode:4/binary,
