@@ -363,9 +363,11 @@ is_digit(C) when C >= $0, C =< $9 -> true;
 is_digit(_) -> false.
 
 -spec skip_whitespace(parser()) -> parser().
-skip_whitespace(P = #{data := <<C, _/binary>>}) when
-    C =:= $\s; C =:= $\t; C =:= $\r; C =:= $\n ->
-  skip_whitespace(skip1(P));
+skip_whitespace(P = #{data := <<$\n, Data/binary>>, line := Line}) ->
+  skip_whitespace(P#{data => Data, line => Line+1, column => 0});
+skip_whitespace(P = #{data := <<C, Data/binary>>, column := Column}) when
+    C =:= $\s; C =:= $\t; C =:= $\r ->
+  skip_whitespace(P#{data => Data, column => Column+1});
 skip_whitespace(P) ->
   P.
 
