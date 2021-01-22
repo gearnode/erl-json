@@ -383,7 +383,7 @@ is_digit(_) -> false.
 
 -spec skip_whitespace(parser()) -> parser().
 skip_whitespace(P = #{data := <<$\n, Data/binary>>, line := Line}) ->
-  skip_whitespace(P#{data => Data, line => Line+1, column => 0});
+  skip_whitespace(P#{data => Data, line => Line+1, column => 1});
 skip_whitespace(P = #{data := <<C, Data/binary>>, column := Column}) when
     C =:= $\s; C =:= $\t; C =:= $\r ->
   skip_whitespace(P#{data => Data, column => Column+1});
