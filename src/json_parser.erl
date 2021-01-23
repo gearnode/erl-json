@@ -14,369 +14,431 @@
 
 -module(json_parser).
 
--export([parse/2, parse_value/2]).
+-export([parse/2]).
 
--type parser() :: #{options := json:parsing_options(),
-                    line := pos_integer(),
-                    column := pos_integer(),
-                    depth := non_neg_integer()}.
+-type state() :: initial
+               | whitespace
+               | value
+               | null
+               | true
+               | false
+               | string
+               | array_start
+               | array_element_or_end
+               | array_separator_or_end
+               | array_element
+               | array_end
+               | object_start
+               | object_key_or_end
+               | object_key
+               | object_key_value_separator
+               | object_value
+               | object_member_separator_or_end
+               | object_member_separator
+               | object_end
+               | number
+               | final.
 
--spec new_parser(json:parsing_options()) -> parser().
-new_parser(Options) ->
-  #{options => Options,
-    line => 1,
-    column => 1,
-    depth => 0}.
-
--spec parser_error(parser(), term()) -> json:error().
-parser_error(#{line := Line, column := Column}, Reason) ->
-  #{reason => Reason,
-    position => {Line, Column}}.
+-type stack_element() :: json:value()
+                       | {json:position(), undefined, undefined}
+                       | {json:position(), binary(), undefined}
+                       | {json:position(), binary(), json:value()}.
+-type stack() :: [stack_element()].
 
 -spec parse(binary(), json:parsing_options()) ->
         {ok, json:value()} | {error, json:error()}.
 parse(Data, Options) ->
-  P = new_parser(Options),
-  try
-    {Value, Data2, P2} = parse1(Data, P),
-    case Data2 of
-      <<>> ->
-        {ok, Value};
-      TrailingData ->
-        {error, parser_error(P2, {unexpected_trailing_data, TrailingData})}
-    end
-  catch
-    throw:{error, Error} ->
+  case parse(initial, [value, final], Data, [], {1,1}, Options) of
+    {ok, Value, <<>>, _} ->
+      {ok, Value};
+    {ok, _, TrailingData, Pos} ->
+      {error, #{reason => {unexpected_trailing_data, TrailingData},
+                position => Pos}};
+    {error, Error} ->
       {error, Error}
   end.
 
--spec parse_value(binary(), json:parsing_options()) ->
-        {ok, json:value(), binary()} | {error, json:error()}.
-parse_value(Data, Options) ->
-  P = new_parser(Options),
-  try
-    {Value, TrailingData, _} = parse1(Data, P),
-    {ok, Value, TrailingData}
-  catch
-    throw:{error, Error} ->
-      {error, Error}
-  end.
+-spec parse(Current :: state(), Nexts :: [state()], binary(), stack(),
+            json:position(), json:parsing_options()) ->
+        {ok, json:value(), binary(), json:position()} | {error, json:error()}.
 
--spec parse1(binary(), parser()) -> {json:value(), binary(), parser()}.
-parse1(_, P = #{options := #{depth_limit := DepthLimit}, depth := Depth}) when
-    Depth > DepthLimit ->
-  throw({error, parser_error(P, depth_limit_reached)});
-parse1(Data0, P0) ->
-  {Data, P} = skip_whitespace(Data0, P0),
-  {Value, Data2, P2} =
-    case Data of
-      <<>> ->
-        throw({error, parser_error(P, no_value)});
-      <<$n, _/binary>> ->
-        parse_null(Data, P);
-      <<$t, _/binary>> ->
-        parse_true(Data, P);
-      <<$f, _/binary>> ->
-        parse_false(Data, P);
-      <<$", _/binary>> ->
-        parse_string(Data, P);
-      <<$[, _/binary>> ->
-        parse_array(Data, P);
-      <<${, _/binary>> ->
-        parse_object(Data, P);
-      <<C, _/binary>> when C =:= $-; C >= $0, C =< $9 ->
-        parse_number(Data, P);
-      <<C, _/binary>> ->
-        throw({error, parser_error(P, {unexpected_character, C})})
-    end,
-  {Data3, P3} = skip_whitespace(Data2, P2),
-  {Value, Data3, P3}.
+%% Initial state.
+parse(initial, Nexts, Data, Stack, Pos, Options) ->
+  parse(whitespace, Nexts, Data, Stack, Pos, Options);
 
--spec parse_null(binary(), parser()) -> {null, binary(), parser()}.
-parse_null(<<"null", Data/binary>>, P = #{column := Column}) ->
-  {null, Data, P#{column => Column+4}};
-parse_null(_, P) ->
-  throw({error, parser_error(P, invalid_element)}).
+%% Whitespace
+parse(whitespace, Nexts, <<$\n, Data/binary>>, Stack, {R, _}, Options) ->
+  parse(whitespace, Nexts, Data, Stack, {R+1,1}, Options);
+parse(whitespace, Nexts, <<B, Data/binary>>, Stack, {R,C}, Options) when
+    B =:= $\s; B =:= $\t; B =:= $\r ->
+  parse(whitespace, Nexts, Data, Stack, {R,C+1}, Options);
+parse(whitespace, [Next | Nexts], Data, Stack, Pos, Options) ->
+  parse(Next, Nexts, Data, Stack, Pos, Options);
 
--spec parse_true(binary(), parser()) -> {true, binary(), parser()}.
-parse_true(<<"true", Data/binary>>, P = #{column := Column}) ->
-  {true, Data, P#{column => Column+4}};
-parse_true(_, P) ->
-  throw({error, parser_error(P, invalid_element)}).
+%% Main value dispatch
+parse(value, Next, Data = <<$n, _/binary>>, Stack, Pos, Options) ->
+  parse(null, Next, Data, Stack, Pos, Options);
+parse(value, Next, Data = <<$t, _/binary>>, Stack, Pos, Options) ->
+  parse(true, Next, Data, Stack, Pos, Options);
+parse(value, Next, Data = <<$f, _/binary>>, Stack, Pos, Options) ->
+  parse(false, Next, Data, Stack, Pos, Options);
+parse(value, Next, Data = <<$", _/binary>>, Stack, Pos, Options) ->
+  parse(string, Next, Data, Stack, Pos, Options);
+parse(value, Next, Data = <<$[, _/binary>>, Stack, Pos, Options) ->
+  parse(array_start, Next, Data, Stack, Pos, Options);
+parse(value, Next, Data = <<${, _/binary>>, Stack, Pos, Options) ->
+  parse(object_start, Next, Data, Stack, Pos, Options);
+parse(value, Next, Data = <<B, _/binary>>, Stack, Pos, Options) when
+    B =:= $-; B >= $0, B =< $9->
+  parse(number, Next, Data, Stack, Pos, Options);
+parse(value, _, <<B, _/binary>>, _, Pos, _) ->
+  {error, #{reason => {unexpected_character, B}, position => Pos}};
+parse(value, _, <<>>, [], Pos, _) ->
+  {error, #{reason => no_value, position => Pos}};
+parse(value, _, <<>>, [Value | _], Pos, _) when is_list(Value) ->
+  {error, #{reason => truncated_array, position => Pos}};
+parse(value, _, <<>>, [Value | _], Pos, _) when is_tuple(Value) ->
+  {error, #{reason => truncated_object, position => Pos}};
+parse(value, _, <<>>, [Value | _], Pos, _) when is_map(Value) ->
+  {error, #{reason => truncated_object, position => Pos}};
 
--spec parse_false(binary(), parser()) -> {false, binary(), parser()}.
-parse_false(<<"false", Data/binary>>, P = #{column := Column}) ->
-  {false, Data, P#{column => Column+5}};
-parse_false(_, P) ->
-  throw({error, parser_error(P, invalid_element)}).
+%% Null
+parse(null, Nexts, <<"null", Data/binary>>, Stack, {R,C}, Options) ->
+  Stack2 = stack_merge(null, Stack),
+  parse(whitespace, Nexts, Data, Stack2, {R,C+4}, Options);
+parse(null, _, _, _, Pos, _) ->
+  {error, #{reason => invalid_element, position => Pos}};
 
--spec parse_string(binary(), parser()) -> {binary(), binary(), parser()}.
-parse_string(<<$", Data/binary>>, P = #{column := Column}) ->
-  parse_string(Data, P#{column => Column+1}, <<>>);
-parse_string(_, P) ->
-  throw({error, parser_error(P, invalid_string)}).
+%% True
+parse(true, Nexts, <<"true", Data/binary>>, Stack, {R,C}, Options) ->
+  Stack2 = stack_merge(true, Stack),
+  parse(whitespace, Nexts, Data, Stack2, {R,C+4}, Options);
+parse(true, _, _, _, Pos, _) ->
+  {error, #{reason => invalid_element, position => Pos}};
 
--spec parse_string(binary(), parser(), binary()) ->
-        {binary(), binary(), parser()}.
-parse_string(<<>>, P, _Acc) ->
-  throw({error, parser_error(P, truncated_string)});
-parse_string(<<$", Data/binary>>, P = #{column := Column}, Acc) ->
-  {Acc, Data, P#{column => Column+1}};
-parse_string(<<$\\, $", Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $">>);
-parse_string(<<$\\, $\\, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $\\>>);
-parse_string(<<$\\, $/, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $/>>);
-parse_string(<<$\\, $b, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $\b>>);
-parse_string(<<$\\, $f, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $\f>>);
-parse_string(<<$\\, $r, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $\r>>);
-parse_string(<<$\\, $n, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $\n>>);
-parse_string(<<$\\, $t, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+2}, <<Acc/binary, $\t>>);
-parse_string(Data = <<$\\, C, _/binary>>, P, Acc) when C =:= $u; C =:= $U ->
-  {Code1, Data2, P2} = parse_unicode_escape_sequence(Data, P),
-  if
-    Code1 >= 16#d800, Code1 =< 16#dbff ->
-      {Code2, Data3, P3} = parse_unicode_escape_sequence(Data2, P2),
-      Code = 16#10_000 + (Code1 - 16#d800 bsl 10) + (Code2 - 16#dc00),
-      parse_string(Data3, P3, <<Acc/binary, Code/utf8>>);
-    true ->
-      parse_string(Data2, P2, <<Acc/binary, Code1/utf8>>)
+%% False
+parse(false, Nexts, <<"false", Data/binary>>, Stack, {R,C}, Options) ->
+  Stack2 = stack_merge(false, Stack),
+  parse(whitespace, Nexts, Data, Stack2, {R,C+5}, Options);
+parse(false, _, _, _, Pos, _) ->
+  {error, #{reason => invalid_element, position => Pos}};
+
+%% String
+parse(string, Nexts, Data = <<$", _/binary>>, Stack, {R,C}, Options) ->
+  case parse_string(Data) of
+    {ok, String, N, Rest} ->
+      Stack2 = stack_merge(String, Stack),
+      parse(whitespace, Nexts, Rest, Stack2, {R,C+N}, Options);
+    {error, Reason, N} ->
+      {error, #{reason => Reason, position => {R,C+N}}}
   end;
-parse_string(<<$\\, _, _/binary>>, P, _Acc) ->
-  throw({error, parser_error(P, invalid_escape_sequence)});
-parse_string(<<$\\>>, P, _Acc) ->
-  throw({error, parser_error(P, truncated_escape_sequence)});
-parse_string(<<C/utf8, Data/binary>>, P = #{column := Column}, Acc) ->
-  parse_string(Data, P#{column => Column+1}, <<Acc/binary, C/utf8>>).
 
--spec parse_unicode_escape_sequence(binary(), parser()) ->
-        {integer(), binary(), parser()}.
-parse_unicode_escape_sequence(<<$\\, C, HexCode:4/binary, Data/binary>>,
-                              P = #{column := Column}) when
-    C =:= $u; C =:= $U ->
+%% Array
+parse(array_start, Nexts, <<$[, Data/binary>>, Stack, {R,C}, Options) ->
+  parse(whitespace, [array_element_or_end | Nexts],
+        Data, [[] | Stack], {R,C+1}, Options);
+
+parse(array_element_or_end, Nexts, Data = <<$], _/binary>>,
+      Stack, Pos, Options) ->
+  parse(array_end, Nexts, Data, Stack, Pos, Options);
+parse(array_element_or_end, Nexts, Data, Stack, Pos, Options) ->
+  parse(array_element, Nexts, Data, Stack, Pos, Options);
+
+parse(array_element, Nexts, Data, Stack, Pos, Options) ->
+  parse(value, [array_separator_or_end | Nexts], Data, Stack, Pos, Options);
+
+parse(array_separator_or_end, Nexts, Data = <<$], _/binary>>,
+      Stack, Pos, Options) ->
+  parse(array_end, Nexts, Data, Stack, Pos, Options);
+parse(array_separator_or_end, Nexts, Data = <<$,, _/binary>>,
+      Stack, Pos, Options) ->
+  parse(array_separator, Nexts, Data, Stack, Pos, Options);
+parse(array_separator_or_end, _, <<>>, _, Pos, _) ->
+  {error, #{reason => truncated_array, position => Pos}};
+
+parse(array_separator, Nexts, <<$,, Data/binary>>, Stack, {R,C}, Options) ->
+  parse(whitespace, [array_element | Nexts], Data, Stack, {R,C+1}, Options);
+
+parse(array_end, Nexts, <<$], Data/binary>>,
+      [Value | Stack], {R,C}, Options) ->
+  Stack2 = stack_merge(lists:reverse(Value), Stack),
+  parse(whitespace, Nexts, Data, Stack2, {R,C+1}, Options);
+
+%% Object
+parse(object_start, Nexts, <<${, Data/binary>>, Stack, {R,C}, Options) ->
+  parse(whitespace, [object_key_or_end | Nexts],
+        Data, [#{} | Stack], {R,C+1}, Options);
+
+parse(object_key_or_end, Nexts, Data = <<$}, _/binary>>,
+      Stack, Pos, Options) ->
+  parse(object_end, Nexts, Data, Stack, Pos, Options);
+parse(object_key_or_end, Nexts, Data, Stack, Pos, Options) ->
+  parse(object_key, Nexts, Data, Stack, Pos, Options);
+
+parse(object_key, Nexts, Data, Stack, Pos, Options) ->
+  Stack2 = [{Pos, undefined, undefined} | Stack],
+  parse(value, [object_key_value_separator | Nexts],
+        Data, Stack2, Pos, Options);
+
+parse(object_key_value_separator, Nexts, <<$:, Data/binary>>,
+      Stack, {R,C}, Options) ->
+  parse(whitespace, [object_value | Nexts], Data, Stack, {R,C+1}, Options);
+parse(object_key_value_separator, _, <<B, _/binary>>, _, Pos, _) ->
+  {error, #{reason => {unexpected_character, B}, position => Pos}};
+parse(object_key_value_separator, _, <<>>, _, Pos, _) ->
+  {error, #{reason => truncated_object, position => Pos}};
+
+parse(object_value, Nexts, Data, Stack, Pos, Options) ->
+  parse(value, [object_member_separator_or_end | Nexts],
+        Data, Stack, Pos, Options);
+
+parse(object_member_separator_or_end, Nexts,
+      Data = <<$}, _/binary>>, [Value | Stack], Pos, Options) ->
+  case stack_merge_member(Value, Stack, Options) of
+    {ok, Stack2} ->
+      parse(object_end, Nexts, Data, Stack2, Pos, Options);
+    {error, Reason} ->
+      {KeyPos, _, _} = Value,
+      {error, #{reason => Reason, position => KeyPos}}
+  end;
+parse(object_member_separator_or_end, Nexts,
+      Data = <<$,, _/binary>>, [Value | Stack], Pos, Options) ->
+  case stack_merge_member(Value, Stack, Options) of
+    {ok, Stack2} ->
+      parse(object_member_separator, Nexts, Data, Stack2, Pos, Options);
+    {error, Reason} ->
+      {KeyPos, _, _} = Value,
+      {error, #{reason => Reason, position => KeyPos}}
+  end;
+parse(object_member_separator_or_end, _, <<>>, _, Pos, _) ->
+  {error, #{reason => truncated_object, position => Pos}};
+
+parse(object_member_separator, Nexts, <<$,, Data/binary>>,
+      Stack, {R,C}, Options) ->
+  parse(whitespace, [object_key | Nexts], Data, Stack, {R,C+1}, Options);
+
+parse(object_end, Nexts, <<$}, Data/binary>>,
+      [Value | Stack], {R,C}, Options) ->
+  Stack2 = stack_merge(Value, Stack),
+  parse(whitespace, Nexts, Data, Stack2, {R,C+1}, Options);
+
+%% Number
+parse(number, Nexts, Data, Stack, {R,C}, Options) ->
+  case parse_number(Data) of
+    {ok, Number, N, Rest} ->
+      Stack2 = stack_merge(Number, Stack),
+      parse(whitespace, Nexts, Rest, Stack2, {R,C+N}, Options);
+    {error, Reason, N} ->
+      {error, #{reason => Reason, position => {R,C+N}}}
+  end;
+
+%% Final state.
+parse(final, [], Data, [Value], Pos, _) ->
+  {ok, Value, Data, Pos}.
+
+-spec parse_string(binary()) ->
+        {ok, binary(), non_neg_integer(), binary()} |
+        {error, json:error_reason(), non_neg_integer()}.
+parse_string(<<$", Data/binary>>) ->
+  parse_string(Data, 1, <<>>).
+
+-spec parse_string(binary(), non_neg_integer(), binary()) ->
+        {ok, binary(), non_neg_integer(), binary()} |
+        {error, json:error_reason(), non_neg_integer()}.
+parse_string(<<>>, N, _) ->
+  {error, truncated_string, N-1};
+parse_string(<<$", Data/binary>>, N, Acc) ->
+  {ok, Acc, N+1, Data};
+parse_string(<<"\\\"", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $">>);
+parse_string(<<"\\\\", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $\\>>);
+parse_string(<<"\\/", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $/>>);
+parse_string(<<"\\b", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $\b>>);
+parse_string(<<"\\f", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $\f>>);
+parse_string(<<"\\r", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $\r>>);
+parse_string(<<"\\n", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $\n>>);
+parse_string(<<"\\t", Data/binary>>, N, Acc) ->
+  parse_string(Data, N+2, <<Acc/binary, $\t>>);
+parse_string(Data = <<"\\", B, _/binary>>, N, Acc) when B =:= $u; B =:= $U ->
+  case parse_unicode_escape_sequence(Data) of
+    {ok, Code1, Data2} when Code1 >= 16#d800, Code1 =< 16#dbff ->
+      case parse_unicode_escape_sequence(Data2) of
+        {ok, Code2, Data3} ->
+          Code = 16#10_000 + (Code1 - 16#d800 bsl 10) + (Code2 - 16#dc00),
+          parse_string(Data3, N+12, <<Acc/binary, Code/utf8>>);
+        {error, Reason} ->
+          {error, Reason, N+6}
+      end;
+    {ok, Code1, Data2} ->
+      parse_string(Data2, N+6, <<Acc/binary, Code1/utf8>>);
+    {error, Reason} ->
+      {error, Reason, N}
+  end;
+parse_string(<<"\\", _, _/binary>>, N, _) ->
+  {error, invalid_escape_sequence, N};
+parse_string(<<"\\">>, N, _) ->
+  {error, truncated_escape_sequence, N};
+parse_string(<<C/utf8, Data/binary>>, N, Acc) ->
+  parse_string(Data, N+1, <<Acc/binary, C/utf8>>).
+
+-spec parse_unicode_escape_sequence(binary()) ->
+        {ok, non_neg_integer(), binary()} | {error, json:error_reason()}.
+parse_unicode_escape_sequence(<<$\\, B, HexDigits:4/binary,
+                                Data/binary>>) when
+    B =:= $u; B =:= $U ->
   try
-    Code = binary_to_integer(HexCode, 16),
-    {Code, Data, P#{column => Column+6}}
+    Code = binary_to_integer(HexDigits, 16),
+    {ok, Code, Data}
   catch error:badarg ->
-      throw({error, parser_error(P, invalid_escape_sequence)})
+      {error, invalid_escape_sequence}
   end;
-parse_unicode_escape_sequence(<<$\\, C, _/binary>>, P) when
-    C =:= $u; C =:= $U ->
-  throw({error, parser_error(P, truncated_escape_sequence)});
-parse_unicode_escape_sequence(<<$\\>>, P) ->
-  throw({error, parser_error(P, truncated_escape_sequence)});
-parse_unicode_escape_sequence(_, P) ->
-  throw({error, parser_error(P, truncated_utf16_surrogate_pair)}).
+parse_unicode_escape_sequence(<<$\\, B, _/binary>>) when
+    B =:= $u; B =:= $U ->
+  {error, truncated_escape_sequence};
+parse_unicode_escape_sequence(<<"\\", _, _/binary>>) ->
+  {error, invalid_escape_sequence};
+parse_unicode_escape_sequence(<<"\\", _/binary>>) ->
+  {error, truncated_escape_sequence};
+parse_unicode_escape_sequence(<<_/binary>>) ->
+  {error, truncated_utf16_surrogate_pair}.
 
--spec parse_array(binary(), parser()) -> {[json:value()], binary(), parser()}.
-parse_array(<<$[, Data/binary>>, P = #{column := Column, depth := Depth}) ->
-  {Data2, P2} = skip_whitespace(Data,
-                                P#{column => Column+1, depth => Depth+1}),
-  parse_array(Data2, P2, []);
-parse_array(_, P) ->
-  throw({error, parser_error(P, invalid_array)}).
+-spec parse_number(binary()) ->
+        {ok, number(), non_neg_integer(), binary()} |
+        {error, json:error_reason(), non_neg_integer()}.
+parse_number(Data) ->
+  parse_number(Data, 0, sign, {1, undefined, 1, undefined}).
 
--spec parse_array(binary(), parser(), [json:value()]) ->
-        {[json:value()], binary(), parser()}.
-parse_array(<<>>, P, _Acc) ->
-  throw({error, parser_error(P, truncated_array)});
-parse_array(<<$], _/binary>>, P, Acc) when Acc =/= [] ->
-  throw({error, parser_error(P, {unexpected_character, $]})});
-parse_array(<<$], Data/binary>>, P = #{column := Column}, Acc) ->
-  {lists:reverse(Acc), Data, P#{column => Column+1}};
-parse_array(Data, P, Acc) ->
-  case parse1(Data, P) of
-    {Value, <<$,, Data2/binary>>, P2 = #{column := Column}} ->
-      {Data3, P3} = skip_whitespace(Data2, P2#{column => Column+1}),
-      parse_array(Data3, P3, [Value | Acc]);
-    {Value, <<$], Data2/binary>>, P2 = #{column := Column}} ->
-      {lists:reverse([Value | Acc]), Data2, P2#{column => Column+1}};
-    {_, <<C, _/binary>>, P2} ->
-      throw({error, parser_error(P2, {unexpected_character, C})});
-    {_, <<>>, P2} ->
-      throw({error, parser_error(P2, truncated_array)})
-  end.
-
--spec parse_object(binary(), parser()) ->
-        {#{binary() := json:value()}, binary(), parser()}.
-parse_object(<<${, Data/binary>>, P = #{column := Column, depth := Depth}) ->
-  {Data2, P2} = skip_whitespace(Data,
-                                P#{column => Column+1, depth => Depth+1}),
-  parse_object(Data2, P2, #{});
-parse_object(_, P) ->
-  throw({error, parser_error(P, invalid_object)}).
-
--spec parse_object(binary(), parser(), #{binary() := json:value()}) ->
-        {#{binary() := json:value()}, binary(), parser()}.
-parse_object(<<>>, P, _Acc) ->
-  throw({error, parser_error(P, truncated_object)});
-parse_object(<<$}, _/binary>>, P, Acc) when map_size(Acc) > 0 ->
-  throw({error, parser_error(P, {unexpected_character, $}})});
-parse_object(<<$}, Data/binary>>, P = #{column := Column}, Acc) ->
-  {Acc, Data, P#{column => Column+1}};
-parse_object(Data, P = #{options := Options}, Acc) ->
-  case parse_object_member(Data, P) of
-    {{Key, Value}, Data2, P2} when is_binary(Key) ->
-      DuplicateKeyHandling = maps:get(duplicate_key_handling, Options, last),
-      Acc2 = case {maps:is_key(Key, Acc), DuplicateKeyHandling} of
-               {true, first} ->
-                 Acc;
-               {true, last} ->
-                 Acc#{Key => Value};
-               {true, error} ->
-                 throw({error, parser_error(P, {duplicate_key, Key})});
-               {false, _} ->
-                 Acc#{Key => Value}
-             end,
-      case skip_whitespace(Data2, P2) of
-        {<<$,, Data3/binary>>, P3 = #{column := Column}} ->
-          {Data4, P4} = skip_whitespace(Data3, P3#{column => Column+1}),
-          parse_object(Data4, P4, Acc2);
-        {<<$}, Data3/binary>>, P3 = #{column := Column}} ->
-          {Acc2, Data3, P3#{column => Column+1}};
-        {<<C, _/binary>>, P3} ->
-          throw({error, parser_error(P3, {unexpected_character, C})});
-        {<<>>, P3} ->
-          throw({error, parser_error(P3, truncated_object)})
-      end;
-    {{Key, _}, _, _} ->
-      throw({error, parser_error(P, {invalid_key, Key})})
-  end.
-
--spec parse_object_member(binary(), parser()) ->
-        {{json:value(), json:value()}, binary(), parser()}.
-parse_object_member(Data, P) ->
-  case parse1(Data, P) of
-    {Key, <<$:, Data2/binary>>, P2 = #{column := Column}} ->
-      case skip_whitespace(Data2, P2#{column => Column+1}) of
-        {<<$}, _/binary>>, P3} ->
-          throw({error, parser_error(P3, {unexpected_character, $}})});
-        {<<>>, P3} ->
-          throw({error, parser_error(P3, truncated_object)});
-        {Data3, P3} ->
-          {Value, Data4, P4} = parse1(Data3, P3),
-          {{Key, Value}, Data4, P4}
-      end;
-    {_, <<C, _/binary>>, P2} ->
-      throw({error, parser_error(P2, {unexpected_character, C})});
-    {_, <<>>, P2} ->
-      throw({error, parser_error(P2, truncated_object)})
-  end.
-
--spec parse_number(binary(), parser()) -> {number(), binary(), parser()}.
-parse_number(Data, P) ->
-  parse_number(Data, P, sign, {1, undefined, 1, undefined}).
-
--spec parse_number(binary(), parser(),
+-spec parse_number(binary(), non_neg_integer(),
                    State :: sign
                           | integer_part
                           | fractional_part
                           | exponent | exponent_sign | exponent_part
                           | final,
                    {Sign :: -1 | 1,
-                    Base :: undefined | {integer, integer()} | {float, float()},
+                    Base :: undefined
+                          | {integer, integer()}
+                          | {float, float()},
                     ExponentSign :: -1 | 1,
                     Exponent :: undefined | integer()}) ->
-        {number(), binary(), parser()}.
+        {ok, number(), non_neg_integer(), binary()} |
+        {error, json:error_reason(), non_neg_integer()}.
 %% Sign
-parse_number(<<$-, Data/binary>>, P = #{column := Column},
-             sign, {_, B, ES, E}) ->
-  parse_number(Data, P#{column => Column+1}, integer_part, {-1, B, ES, E});
+parse_number(<<$-, Data/binary>>, N, sign, {_, B, ES, E}) ->
+  parse_number(Data, N+1, integer_part, {-1, B, ES, E});
 parse_number(Data, P, sign, Acc) ->
   parse_number(Data, P, integer_part, Acc);
 %% Integer part
-parse_number(Data = <<C, _/binary>>, P = #{column := Column},
-             integer_part, {S, _, ES, E}) when
+parse_number(Data = <<C, _/binary>>, N, integer_part, {S, _, ES, E}) when
     C >= $0, C =< $9 ->
-  {I, Rest, Length} = parse_simple_integer(Data),
-  parse_number(Rest, P#{column => Column+Length},
-               fractional_part, {S, {integer, I}, ES, E});
-parse_number(_, P, integer_part, _Acc) ->
-      throw({error, parser_error(P, invalid_number)});
+  {I, N2, Rest} = parse_integer(Data),
+  parse_number(Rest, N+N2, fractional_part, {S, {integer, I}, ES, E});
+parse_number(_, N, integer_part, _Acc) ->
+  {error, invalid_number, N};
 %% Fractional part
-parse_number(<<$., Data/binary>>, P = #{column := Column},
-             fractional_part, {S, B, ES, E}) ->
+parse_number(<<$., Data/binary>>, N, fractional_part, {S, B, ES, E}) ->
   case Data of
     <<C, _/binary>> when C >= $0, C =< $9 ->
-      {F0, Rest, Length} = parse_simple_integer(Data),
-      F = F0 / math:pow(10, Length),
+      {F0, N2, Rest} = parse_integer(Data),
+      F = F0 / math:pow(10, N2),
       I = case B of
             undefined -> 0;
             {integer, I2} -> I2
           end,
-      parse_number(Rest, P#{column => Column+Length+1},
-                   exponent, {S, {float, I + F}, ES, E});
+      parse_number(Rest, N+N2+1, exponent, {S, {float, I + F}, ES, E});
     _ ->
-      throw({error, parser_error(P, invalid_number)})
+      {error, invalid_number, N}
   end;
-parse_number(Data, P, fractional_part, Acc) ->
-  parse_number(Data, P, exponent, Acc);
+parse_number(Data, N, fractional_part, Acc) ->
+  parse_number(Data, N, exponent, Acc);
 %% Exponent
-parse_number(<<C, Data/binary>>, P = #{column := Column}, exponent, Acc) when
-    C =:= $e; C =:= $E ->
-  parse_number(Data, P#{column => Column+1}, exponent_sign, Acc);
-parse_number(Data, P, exponent, Acc) ->
-  parse_number(Data, P, final, Acc);
+parse_number(<<C, Data/binary>>, N, exponent, Acc) when C =:= $e; C =:= $E ->
+  parse_number(Data, N+1, exponent_sign, Acc);
+parse_number(Data, N, exponent, Acc) ->
+  parse_number(Data, N, final, Acc);
 %% Exponent sign
-parse_number(<<$-, Data/binary>>, P = #{column := Column},
-             exponent_sign, {S, B, _, E}) ->
-  parse_number(Data, P#{column => Column+1}, exponent_part, {S, B, -1, E});
-parse_number(<<$+, Data/binary>>, P = #{column := Column},
-             exponent_sign, {S, B, _, E}) ->
-  parse_number(Data, P#{column => Column+1}, exponent_part, {S, B, 1, E});
-parse_number(Data, P, exponent_sign, Acc) ->
-  parse_number(Data, P, exponent_part, Acc);
+parse_number(<<$-, Data/binary>>, N, exponent_sign, {S, B, _, E}) ->
+  parse_number(Data, N+1, exponent_part, {S, B, -1, E});
+parse_number(<<$+, Data/binary>>, N, exponent_sign, {S, B, _, E}) ->
+  parse_number(Data, N+1, exponent_part, {S, B, 1, E});
+parse_number(Data, N, exponent_sign, Acc) ->
+  parse_number(Data, N, exponent_part, Acc);
 %% Exponent part
-parse_number(Data = <<C, _/binary>>, P = #{column := Column},
-             exponent_part, {S, B, ES, _}) when
+parse_number(Data = <<C, _/binary>>, N, exponent_part, {S, B, ES, _}) when
     C >= $0, C =< $9 ->
-  {E, Rest, Length} = parse_simple_integer(Data),
-  parse_number(Rest, P#{column => Column+Length}, final, {S, B, ES, E});
-parse_number(_, P, exponent_part, _Acc) ->
-      throw({error, parser_error(P, invalid_number)});
+  {E, N2, Rest} = parse_integer(Data),
+  parse_number(Rest, N+N2, final, {S, B, ES, E});
+parse_number(_, N, exponent_part, _Acc) ->
+  {error, invalid_number, N};
 %% Final state
-parse_number(Data, P, final, {S, {integer, I}, _, undefined}) ->
-  {S * I, Data, P};
-parse_number(Data, P, final, {S, {integer, I}, ES, E}) ->
-  {S * I* math:pow(10, E * ES), Data, P};
-parse_number(Data, P, final, {S, {float, F}, _, undefined}) ->
-  {S * F, Data, P};
-parse_number(Data, P, final, {S, {float, F}, ES, E}) ->
-  {S * F * math:pow(10, E * ES), Data, P}.
+parse_number(Data, N, final, {S, {integer, I}, _, undefined}) ->
+  {ok, S * I, N, Data};
+parse_number(Data, N, final, {S, {integer, I}, ES, E}) ->
+  {ok, S * I* math:pow(10, E * ES), N, Data};
+parse_number(Data, N, final, {S, {float, F}, _, undefined}) ->
+  {ok, S * F, N, Data};
+parse_number(Data, N, final, {S, {float, F}, ES, E}) ->
+  {ok, S * F * math:pow(10, E * ES), N, Data}.
 
--spec parse_simple_integer(binary()) ->
-        {I :: integer(), Rest :: binary(), Length :: non_neg_integer()}.
-parse_simple_integer(Data) ->
-  parse_simple_integer(Data, 0, 0).
+-spec parse_integer(binary()) ->
+        {integer(), non_neg_integer(), binary()}.
+parse_integer(Data) ->
+  parse_integer(Data, 0, 0).
 
--spec parse_simple_integer(binary(), I :: integer(),
-                           Length :: non_neg_integer()) ->
-        {I :: integer(), Rest :: binary(), Length :: non_neg_integer()}.
-parse_simple_integer(<<>>, I, Length) ->
-  {I, <<>>, Length};
-parse_simple_integer(Data = <<C, Rest/binary>>, I, Length) ->
+-spec parse_integer(binary(), non_neg_integer(), integer()) ->
+        {integer(), non_neg_integer(), binary()}.
+parse_integer(<<>>, N, I) ->
+  {I, N, <<>>};
+parse_integer(Data = <<C, Rest/binary>>, N, I) ->
   case is_digit(C) of
     true ->
-      parse_simple_integer(Rest, I*10 + C-$0, Length+1);
+      parse_integer(Rest, N+1, I*10 + C-$0);
     false ->
-      {I, Data, Length}
+      {I, N, Data}
   end.
 
 -spec is_digit(integer()) -> boolean().
-is_digit(C) when C >= $0, C =< $9 -> true;
-is_digit(_) -> false.
+is_digit(C) when C >= $0, C =< $9 ->
+  true;
+is_digit(_) ->
+  false.
 
--spec skip_whitespace(binary(), parser()) -> {binary(), parser()}.
-skip_whitespace(<<$\n, Data/binary>>, P = #{line := Line}) ->
-  skip_whitespace(Data, P#{line => Line+1, column => 1});
-skip_whitespace(<<C, Data/binary>>, P = #{column := Column}) when
-    C =:= $\s; C =:= $\t; C =:= $\r ->
-  skip_whitespace(Data, P#{column => Column+1});
-skip_whitespace(Data, P) ->
-  {Data, P}.
+-spec stack_merge(stack_element(), stack()) -> stack().
+stack_merge(Value, []) ->
+  [Value];
+stack_merge(Key, [{Pos, undefined, undefined} | Values]) ->
+  [{Pos, Key, undefined} | Values];
+stack_merge(Value, [{Pos, Key, undefined} | Values]) ->
+  [{Pos, Key, Value} | Values];
+stack_merge(Value, [Parent | Values]) when is_list(Parent) ->
+  [[Value | Parent] | Values].
+
+-spec stack_merge_member(stack_element(), stack(), json:parsing_options()) ->
+        {ok, stack()} | {error, json:error_reason()}.
+stack_merge_member({_, Key, Value}, [Parent | Values], Options) when
+    is_binary(Key) ->
+  case maps:get(duplicate_key_handling, Options, last) of
+    last ->
+      {ok, [Parent#{Key => Value} | Values]};
+    first ->
+      case maps:is_key(Key, Parent) of
+        true ->
+          {ok, [Parent | Values]};
+        false ->
+          {ok, [Parent#{Key => Value} | Values]}
+      end;
+    error ->
+      case maps:is_key(Key, Parent) of
+        true ->
+          {error, {duplicate_key, Key}};
+        false ->
+          {ok, [Parent#{Key => Value} | Values]}
+      end
+  end;
+stack_merge_member({_, Key, _}, _, _) ->
+  {error, {invalid_key, Key}}.

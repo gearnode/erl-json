@@ -17,9 +17,6 @@ For example, `json:parse(<<"[1, 2, 3]">>)` returns `{ok,[1,2,3]}`.
 
 ### Options
 Parsing options are represented as a map. The following options are available:
-- `depth_limit`: a positive integer indicating the maximal JSON element depth;
-  when the limit is reached, an error with the `depth_limit_reached` reason is
-  returned.
 - `duplicate_key_handling`: an atom indicating how to handle duplicate keys in
   objects; valid values are:
   - `first`: keep the value associated with the first occurrence of the key.

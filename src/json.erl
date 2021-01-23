@@ -40,28 +40,24 @@
 -type error() :: #{reason => term(),
                    position => position()}.
 
--type error_reason() :: no_value
-                      | depth_limit_reached
-                      | {unexpected_trailing_data, binary()}
-                      | {unexpected_character, integer()}
-                      | invalid_element
-                      | invalid_number
-                      | invalid_string
-                      | truncated_string
-                      | invalid_escape_sequence
-                      | truncated_escape_sequence
-                      | truncated_utf16_surrogate_pair
-                      | invalid_array
-                      | truncated_array
-                      | invalid_object
-                      | truncated_object
-                      | {invalid_key, value()}
-                      | {duplicate_key, binary()}.
+-type error_reason() ::
+        no_value
+      | {unexpected_trailing_data, binary()}
+      | {unexpected_character, byte()}
+      | invalid_element
+      | truncated_string
+      | truncated_escape_sequence
+      | truncated_utf16_surrogate_pair
+      | invalid_escape_sequence
+      | truncated_array
+      | truncated_object
+      | {invalid_key, value()}
+      | {duplicate_key, binary()}
+      | invalid_number.
 
 -type position() :: {Line :: pos_integer(), Column :: pos_integer()}.
 
--type parsing_options() :: #{depth_limit => non_neg_integer(),
-                             duplicate_key_handling =>
+-type parsing_options() :: #{duplicate_key_handling =>
                                duplicate_key_handling()}.
 
 -type duplicate_key_handling() :: first | last | error.

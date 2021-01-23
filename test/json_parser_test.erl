@@ -116,10 +116,10 @@ parse_strings_test_() ->
                  parse(<<"\"\\u00E9l\\U00e9ment\"">>)),
    ?_assertEqual({ok, <<"foo 𝄞 bar"/utf8>>},
                  parse(<<"\"foo \\uD834\\uDD1E bar\"">>)),
-   ?_assertEqual({error, #{position => {1, 2},
+   ?_assertEqual({error, #{position => {1, 1},
                            reason => truncated_string}},
                  parse(<<"\"">>)),
-   ?_assertEqual({error, #{position => {1, 5},
+   ?_assertEqual({error, #{position => {1, 4},
                            reason => truncated_string}},
                  parse(<<"\"foo">>)),
    ?_assertEqual({error, #{position => {1, 5},
@@ -200,6 +200,9 @@ parse_objects_test_() ->
    ?_assertEqual({ok, #{<<"a">> => 3, <<"b">> => 2}},
                  parse(<<"{\"a\": 1, \"b\": 2, \"a\": 3}">>,
                             #{duplicate_key_handling => last})),
+   ?_assertEqual({error, #{position => {1, 2},
+                           reason => {invalid_key, 1}}},
+                 parse(<<"{1: true}">>)),
    ?_assertEqual({error, #{position => {1, 18},
                            reason => {duplicate_key, <<"a">>}}},
                  parse(<<"{\"a\": 1, \"b\": 2, \"a\": 3}">>,
@@ -231,30 +234,6 @@ parse_objects_test_() ->
    ?_assertEqual({error, #{position => {1, 8},
                            reason => {unexpected_character, $}}}},
                  parse(<<"{\"foo\":}">>))].
-
-parse_depth_test_() ->
-  [?_assertEqual({ok, 42},
-                 parse(<<"42">>, #{depth_limit => 0})),
-   ?_assertEqual({error, #{position => {1, 2},
-                           reason => depth_limit_reached}},
-                 parse(<<"[42]">>, #{depth_limit => 0})),
-   ?_assertEqual({ok, [42]},
-                 parse(<<"[42]">>, #{depth_limit => 1})),
-   ?_assertEqual({error, #{position => {1, 2},
-                           reason => depth_limit_reached}},
-                 parse(<<"{\"a\": 1}">>, #{depth_limit => 0})),
-   ?_assertEqual({ok, #{<<"a">> => 1}},
-                 parse(<<"{\"a\": 1}">>, #{depth_limit => 1})),
-   ?_assertEqual({error, #{position => {1, 3},
-                           reason => depth_limit_reached}},
-                 parse(<<"[[1, 2]]">>, #{depth_limit => 1})),
-   ?_assertEqual({ok, [[1, 2]]},
-                 parse(<<"[[1, 2]]">>, #{depth_limit => 2})),
-   ?_assertEqual({error, #{position => {1, 8},
-                           reason => depth_limit_reached}},
-                 parse(<<"{\"a\": [1, 2, 3]}">>, #{depth_limit => 1})),
-   ?_assertEqual({ok, #{<<"a">> => [1, 2, 3]}},
-                 parse(<<"{\"a\": [1, 2, 3]}">>, #{depth_limit => 2}))].
 
 -spec parse(binary()) -> {ok, json:value()} | {error, term()}.
 parse(Data) ->
