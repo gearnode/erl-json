@@ -249,46 +249,54 @@ parse_string(<<>>, N, _) ->
   {error, truncated_string, N-1};
 parse_string(<<$", Data/binary>>, N, Acc) ->
   {ok, Acc, N+1, Data};
-parse_string(Data = <<$\\, Rest/binary>>, N, Acc) ->
-  case Rest of
-    <<$\", Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $">>);
-    <<$\\, Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $\\>>);
-    <<$\/, Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $/>>);
-    <<$b, Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $\b>>);
-    <<$f, Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $\f>>);
-    <<$r, Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $\r>>);
-    <<$n, Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $\n>>);
-    <<$t, Data2/binary>> ->
-      parse_string(Data2, N+2, <<Acc/binary, $\t>>);
-    <<B, _/binary>> when B =:= $u; B =:= $U ->
-      case parse_unicode_escape_sequence(Data) of
-        {ok, Code1, Data2} when Code1 >= 16#d800, Code1 =< 16#dbff ->
-          case parse_unicode_escape_sequence(Data2) of
-            {ok, Code2, Data3} ->
-              Code = 16#10_000 + (Code1 - 16#d800 bsl 10) + (Code2 - 16#dc00),
-              parse_string(Data3, N+12, <<Acc/binary, Code/utf8>>);
-            {error, Reason} ->
-              {error, Reason, N+6}
-          end;
-        {ok, Code1, Data2} ->
-          parse_string(Data2, N+6, <<Acc/binary, Code1/utf8>>);
-        {error, Reason} ->
-          {error, Reason, N}
-      end;
-    <<_, _/binary>> ->
-      {error, invalid_escape_sequence, N};
-    <<>> ->
-      {error, truncated_escape_sequence, N}
+parse_string(Data = <<$\\, _/binary>>, N, Acc) ->
+  case parse_escape_sequence(Data) of
+    {ok, Code, Length, Data2} ->
+      parse_string(Data2, N+Length, <<Acc/binary, Code/utf8>>);
+    {error, Reason, Offset} ->
+      {error, Reason, N+Offset}
   end;
 parse_string(<<C/utf8, Data/binary>>, N, Acc) ->
   parse_string(Data, N+1, <<Acc/binary, C/utf8>>).
+
+-spec parse_escape_sequence(binary()) ->
+        {ok, non_neg_integer(), non_neg_integer(), binary()} |
+        {error, json:error_reason(), non_neg_integer()}.
+parse_escape_sequence(<<$\\, $\", Data/binary>>) ->
+  {ok, $", 2, Data};
+parse_escape_sequence(<<$\\, $\\, Data/binary>>) ->
+  {ok, $\\, 2, Data};
+parse_escape_sequence(<<$\\, $\/, Data/binary>>) ->
+  {ok, $/, 2, Data};
+parse_escape_sequence(<<$\\, $b, Data/binary>>) ->
+  {ok, $\b, 2, Data};
+parse_escape_sequence(<<$\\, $f, Data/binary>>) ->
+  {ok, $\f, 2, Data};
+parse_escape_sequence(<<$\\, $r, Data/binary>>) ->
+  {ok, $\r, 2, Data};
+parse_escape_sequence(<<$\\, $n, Data/binary>>) ->
+  {ok, $\n, 2, Data};
+parse_escape_sequence(<<$\\, $t, Data/binary>>) ->
+  {ok, $\t, 2, Data};
+parse_escape_sequence(Data = <<$\\, B, _/binary>>) when B =:= $u; B =:= $U ->
+  case parse_unicode_escape_sequence(Data) of
+    {ok, Code1, Data2} when Code1 >= 16#d800, Code1 =< 16#dbff ->
+      case parse_unicode_escape_sequence(Data2) of
+        {ok, Code2, Data3} ->
+          Code = 16#10_000 + (Code1 - 16#d800 bsl 10) + (Code2 - 16#dc00),
+          {ok, Code, 12, Data3};
+        {error, Reason} ->
+          {error, Reason, 6}
+      end;
+    {ok, Code1, Data2} ->
+      {ok, Code1, 6, Data2};
+    {error, Reason} ->
+      {error, Reason, 0}
+  end;
+parse_escape_sequence(<<$\\, _, _/binary>>) ->
+  {error, invalid_escape_sequence, 0};
+parse_escape_sequence(<<$\\>>) ->
+  {error, truncated_escape_sequence, 0}.
 
 -spec parse_unicode_escape_sequence(binary()) ->
         {ok, non_neg_integer(), binary()} | {error, json:error_reason()}.
