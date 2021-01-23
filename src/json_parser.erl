@@ -245,19 +245,41 @@ parse_string(<<$", Data/binary>>) ->
 -spec parse_string(binary(), non_neg_integer(), binary()) ->
         {ok, binary(), non_neg_integer(), binary()} |
         {error, json:error_reason(), non_neg_integer()}.
-parse_string(<<>>, N, _) ->
-  {error, truncated_string, N-1};
-parse_string(<<$", Data/binary>>, N, Acc) ->
-  {ok, Acc, N+1, Data};
-parse_string(Data = <<$\\, _/binary>>, N, Acc) ->
-  case parse_escape_sequence(Data) of
-    {ok, Code, Length, Data2} ->
-      parse_string(Data2, N+Length, <<Acc/binary, Code/utf8>>);
+parse_string(Data, N, Acc) ->
+  case read_non_escaped_characters(Data) of
+    {ok, Data2 = <<$", Rest/binary>>, N2} ->
+      Acc2 = binary:part(Data, {0, byte_size(Data) - byte_size(Data2)}),
+      {ok, <<Acc/binary, Acc2/binary>>, N+N2+1, Rest};
+    {ok, Data2 = <<$\\, _/binary>>, N2} ->
+      Acc2 = binary:part(Data, {0, byte_size(Data) - byte_size(Data2)}),
+      case parse_escape_sequence(Data2) of
+        {ok, Code, Length, Data3} ->
+          parse_string(Data3, N+N2+Length,
+                       <<Acc/binary, Acc2/binary, Code/utf8>>);
+        {error, Reason, Offset} ->
+          {error, Reason, N+N2+Offset}
+      end;
     {error, Reason, Offset} ->
       {error, Reason, N+Offset}
-  end;
-parse_string(<<C/utf8, Data/binary>>, N, Acc) ->
-  parse_string(Data, N+1, <<Acc/binary, C/utf8>>).
+  end.
+
+-spec read_non_escaped_characters(binary()) ->
+        {ok, binary(), non_neg_integer()} |
+        {error, json:error_reason(), non_neg_integer()}.
+read_non_escaped_characters(Data) ->
+  read_non_escaped_characters(Data, 0).
+
+-spec read_non_escaped_characters(binary(), non_neg_integer()) ->
+        {ok, binary(), non_neg_integer()} |
+        {error, json:error_reason(), non_neg_integer()}.
+read_non_escaped_characters(<<>>, N) ->
+  {error, truncated_string, N-1};
+read_non_escaped_characters(Data = <<$", _/binary>>, N) ->
+  {ok, Data, N};
+read_non_escaped_characters(Data = <<$\\, _/binary>>, N) ->
+  {ok, Data, N};
+read_non_escaped_characters(<<_/utf8, Data/binary>>, N) ->
+  read_non_escaped_characters(Data, N+1).
 
 -spec parse_escape_sequence(binary()) ->
         {ok, non_neg_integer(), non_neg_integer(), binary()} |
