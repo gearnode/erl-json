@@ -142,7 +142,13 @@ parse_strings_test_() ->
                  parse(<<"\"foo\\ud834\\u">>)),
    ?_assertEqual({error, #{position => {1, 11},
                            reason => truncated_escape_sequence}},
-                 parse(<<"\"foo\\ud834\\udd1">>))].
+                 parse(<<"\"foo\\ud834\\udd1">>)),
+   ?_assertEqual({error, #{position => {1, 3},
+                           reason =>{invalid_string_character, $\n}}},
+                 parse(<<"\"a\nb\"">>)),
+   ?_assertEqual({error, #{position => {1, 5},
+                           reason =>{invalid_string_character, 0}}},
+                 parse(<<"\"foo\0\"">>))].
 
 parse_arrays_test_() ->
   [?_assertEqual({ok, []},

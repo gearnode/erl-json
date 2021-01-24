@@ -280,6 +280,8 @@ read_non_escaped_characters(Data = <<$", _/binary>>, N) ->
   {ok, Data, N};
 read_non_escaped_characters(Data = <<$\\, _/binary>>, N) ->
   {ok, Data, N};
+read_non_escaped_characters(<<B, _/binary>>, N) when B =< 16#1f ->
+  {error, {invalid_string_character, B}, N};
 read_non_escaped_characters(<<_/utf8, Data/binary>>, N) ->
   read_non_escaped_characters(Data, N+1).
 

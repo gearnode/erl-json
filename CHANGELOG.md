@@ -3,6 +3,8 @@
 # Next Version
 ## Features
 - Add the `json:array/0` and `json:object/0` types.
+## Bug fixes
+- Reject non-escaped control characters as required by RFC 8259.
 ## Misc
 - Remove the extra space before object values in the serializer.
 - Make the parser about 7.5 times faster (tested on the Kubernetes OpenAPI
