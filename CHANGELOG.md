@@ -5,7 +5,8 @@
 - Add the `json:array/0` and `json:object/0` types.
 ## Misc
 - Remove the extra space before object values in the serializer.
-- Make the parser roughly 60% faster.
+- Make the parser about 7.5 times faster (tested on the Kubernetes OpenAPI
+  schema: 5.3MB, 100+k lines).
 
 # 1.2.0
 ## Features
