@@ -240,22 +240,22 @@ parse(final, [], Data, [Value], Pos, _) ->
         {ok, binary(), non_neg_integer(), binary()} |
         {error, json:error_reason(), non_neg_integer()}.
 parse_string(<<$", Data/binary>>) ->
-  parse_string(Data, 1, <<>>).
+  parse_string(Data, 1, []).
 
--spec parse_string(binary(), non_neg_integer(), binary()) ->
+-spec parse_string(binary(), non_neg_integer(), iodata()) ->
         {ok, binary(), non_neg_integer(), binary()} |
         {error, json:error_reason(), non_neg_integer()}.
 parse_string(Data, N, Acc) ->
   case read_non_escaped_characters(Data) of
     {ok, Data2 = <<$", Rest/binary>>, N2} ->
       Acc2 = binary:part(Data, {0, byte_size(Data) - byte_size(Data2)}),
-      {ok, <<Acc/binary, Acc2/binary>>, N+N2+1, Rest};
+      String = iolist_to_string(lists:reverse([Acc2 | Acc])),
+      {ok, String, N+N2+1, Rest};
     {ok, Data2 = <<$\\, _/binary>>, N2} ->
       Acc2 = binary:part(Data, {0, byte_size(Data) - byte_size(Data2)}),
       case parse_escape_sequence(Data2) of
         {ok, Code, Length, Data3} ->
-          parse_string(Data3, N+N2+Length,
-                       <<Acc/binary, Acc2/binary, Code/utf8>>);
+          parse_string(Data3, N+N2+Length, [Code | [Acc2 | Acc]]);
         {error, Reason, Offset} ->
           {error, Reason, N+N2+Offset}
       end;
@@ -440,6 +440,18 @@ is_digit(C) when C >= $0, C =< $9 ->
   true;
 is_digit(_) ->
   false.
+
+-spec iolist_to_string(iolist()) -> binary().
+iolist_to_string(Data) ->
+  %% We always validate data put into the iolist, so it should not fail here.
+  case unicode:characters_to_binary(Data) of
+    String when is_binary(String) ->
+      String;
+    {error, _, _} ->
+      error({invalid_unicode_data, Data});
+    {incomplete, _, _} ->
+      error({invalid_unicode_data, Data})
+  end.
 
 -spec stack_merge(stack_element(), stack()) -> stack().
 stack_merge(Value, []) ->
