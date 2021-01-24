@@ -1,6 +1,8 @@
 % erl-json changelog
 
 # Next Version
+
+# 1.3.0
 ## Features
 - Add the `json:array/0` and `json:object/0` types.
 - Add error formatting functions.
