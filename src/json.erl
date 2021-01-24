@@ -47,6 +47,7 @@
       | invalid_element
       | truncated_string
       | {invalid_string_character, non_neg_integer()}
+      | invalid_utf8_sequence
       | truncated_escape_sequence
       | truncated_utf16_surrogate_pair
       | invalid_escape_sequence

@@ -93,6 +93,8 @@ parse(value, Next, Data = <<B, _/binary>>, Stack, Pos, Options) when
   parse(number, Next, Data, Stack, Pos, Options);
 parse(value, _, <<B/utf8, _/binary>>, _, Pos, _) ->
   {error, #{reason => {unexpected_character, B}, position => Pos}};
+parse(value, _, <<_, _/binary>>, _, Pos, _) ->
+  {error, #{reason => invalid_utf8_sequence, position => Pos}};
 parse(value, _, <<>>, [], Pos, _) ->
   {error, #{reason => no_value, position => Pos}};
 parse(value, _, <<>>, [Value | _], Pos, _) when is_list(Value) ->
@@ -155,6 +157,8 @@ parse(array_separator_or_end, Nexts, Data = <<$,, _/binary>>,
   parse(array_separator, Nexts, Data, Stack, Pos, Options);
 parse(array_separator_or_end, _, <<B/utf8, _/binary>>, _, Pos, _) ->
   {error, #{reason => {unexpected_character, B}, position => Pos}};
+parse(array_separator_or_end, _, <<_, _/binary>>, _, Pos, _) ->
+  {error, #{reason => invalid_utf8_sequence, position => Pos}};
 parse(array_separator_or_end, _, <<>>, _, Pos, _) ->
   {error, #{reason => truncated_array, position => Pos}};
 
@@ -187,6 +191,8 @@ parse(object_key_value_separator, Nexts, <<$:, Data/binary>>,
   parse(whitespace, [object_value | Nexts], Data, Stack, {R,C+1}, Options);
 parse(object_key_value_separator, _, <<B/utf8, _/binary>>, _, Pos, _) ->
   {error, #{reason => {unexpected_character, B}, position => Pos}};
+parse(object_key_value_separator, _, <<_, _/binary>>, _, Pos, _) ->
+  {error, #{reason => invalid_utf8_sequence, position => Pos}};
 parse(object_key_value_separator, _, <<>>, _, Pos, _) ->
   {error, #{reason => truncated_object, position => Pos}};
 
@@ -283,7 +289,9 @@ read_non_escaped_characters(Data = <<$\\, _/binary>>, N) ->
 read_non_escaped_characters(<<B, _/binary>>, N) when B =< 16#1f ->
   {error, {invalid_string_character, B}, N};
 read_non_escaped_characters(<<_/utf8, Data/binary>>, N) ->
-  read_non_escaped_characters(Data, N+1).
+  read_non_escaped_characters(Data, N+1);
+read_non_escaped_characters(<<_, _/binary>>, N) ->
+  {error, invalid_utf8_sequence, N}.
 
 -spec parse_escape_sequence(binary()) ->
         {ok, non_neg_integer(), non_neg_integer(), binary()} |

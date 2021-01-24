@@ -148,7 +148,10 @@ parse_strings_test_() ->
                  parse(<<"\"a\nb\"">>)),
    ?_assertEqual({error, #{position => {1, 5},
                            reason =>{invalid_string_character, 0}}},
-                 parse(<<"\"foo\0\"">>))].
+                 parse(<<"\"foo\0\"">>)),
+   ?_assertEqual({error, #{position => {1, 2},
+                           reason => invalid_utf8_sequence}},
+                 parse(<<$", 233, $t, 233, $">>))].
 
 parse_arrays_test_() ->
   [?_assertEqual({ok, []},
