@@ -43,7 +43,7 @@
 -type error_reason() ::
         no_value
       | {unexpected_trailing_data, binary()}
-      | {unexpected_character, byte()}
+      | {unexpected_character, non_neg_integer}
       | invalid_element
       | truncated_string
       | truncated_escape_sequence

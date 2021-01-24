@@ -91,7 +91,7 @@ parse(value, Next, Data = <<${, _/binary>>, Stack, Pos, Options) ->
 parse(value, Next, Data = <<B, _/binary>>, Stack, Pos, Options) when
     B =:= $-; B >= $0, B =< $9->
   parse(number, Next, Data, Stack, Pos, Options);
-parse(value, _, <<B, _/binary>>, _, Pos, _) ->
+parse(value, _, <<B/utf8, _/binary>>, _, Pos, _) ->
   {error, #{reason => {unexpected_character, B}, position => Pos}};
 parse(value, _, <<>>, [], Pos, _) ->
   {error, #{reason => no_value, position => Pos}};
@@ -153,6 +153,8 @@ parse(array_separator_or_end, Nexts, Data = <<$], _/binary>>,
 parse(array_separator_or_end, Nexts, Data = <<$,, _/binary>>,
       Stack, Pos, Options) ->
   parse(array_separator, Nexts, Data, Stack, Pos, Options);
+parse(array_separator_or_end, _, <<B/utf8, _/binary>>, _, Pos, _) ->
+  {error, #{reason => {unexpected_character, B}, position => Pos}};
 parse(array_separator_or_end, _, <<>>, _, Pos, _) ->
   {error, #{reason => truncated_array, position => Pos}};
 
@@ -183,7 +185,7 @@ parse(object_key, Nexts, Data, Stack, Pos, Options) ->
 parse(object_key_value_separator, Nexts, <<$:, Data/binary>>,
       Stack, {R,C}, Options) ->
   parse(whitespace, [object_value | Nexts], Data, Stack, {R,C+1}, Options);
-parse(object_key_value_separator, _, <<B, _/binary>>, _, Pos, _) ->
+parse(object_key_value_separator, _, <<B/utf8, _/binary>>, _, Pos, _) ->
   {error, #{reason => {unexpected_character, B}, position => Pos}};
 parse(object_key_value_separator, _, <<>>, _, Pos, _) ->
   {error, #{reason => truncated_object, position => Pos}};

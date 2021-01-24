@@ -162,6 +162,9 @@ parse_arrays_test_() ->
    ?_assertEqual({error, #{position => {1, 2},
                            reason => truncated_array}},
                  parse(<<"[">>)),
+   ?_assertEqual({error, #{position => {1, 2},
+                           reason => {unexpected_character, $,}}},
+                 parse(<<"[,">>)),
    ?_assertEqual({error, #{position => {1, 3},
                            reason => truncated_array}},
                  parse(<<"[1">>)),
@@ -179,7 +182,10 @@ parse_arrays_test_() ->
                  parse(<<"[1,2,,]">>)),
    ?_assertEqual({error, #{position => {1, 6},
                            reason => {unexpected_character, $,}}},
-                 parse(<<"[1,2,,3]">>))].
+                 parse(<<"[1,2,,3]">>)),
+   ?_assertEqual({error, #{position => {1, 3},
+                           reason => {unexpected_character, $é}}},
+                 parse(<<"[1é"/utf8>>))].
 
 parse_objects_test_() ->
   [?_assertEqual({ok, #{}},
@@ -216,6 +222,12 @@ parse_objects_test_() ->
    ?_assertEqual({error, #{position => {1, 7},
                            reason => truncated_object}},
               parse(<<"{\"foo\"">>)),
+   ?_assertEqual({error, #{position => {1, 7},
+                           reason => {unexpected_character, $}}}},
+              parse(<<"{\"foo\"}">>)),
+   ?_assertEqual({error, #{position => {1, 7},
+                           reason => {unexpected_character, $à}}},
+              parse(<<"{\"foo\"à"/utf8>>)),
    ?_assertEqual({error, #{position => {1, 9},
                            reason => truncated_object}},
               parse(<<"{\"foo\": ">>)),
