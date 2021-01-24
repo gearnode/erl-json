@@ -30,6 +30,9 @@ Parsing errors are returned as maps which may contain the following fields:
   the JSON source.
 - `reason`: a value representing the cause of the error (mandatory).
 
+The `json:format_error/1` function can be used to obtain a human-readable
+error string from an error value.
+
 ## Serialization
 The `json:serialize/1` and `json:serialize/2` functions are used to serialize
 an Erlang term to a JSON string.

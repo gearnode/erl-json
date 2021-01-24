@@ -3,6 +3,7 @@
 # Next Version
 ## Features
 - Add the `json:array/0` and `json:object/0` types.
+- Add error formatting functions.
 ## Bug fixes
 - Reject non-escaped control characters as required by RFC 8259.
 - Reject invalid UTF-8 sequences.

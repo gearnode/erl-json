@@ -15,7 +15,8 @@
 -module(json).
 
 -export([parse/1, parse/2, serialize/1, serialize/2,
-         default_serializers/0]).
+         default_serializers/0,
+         format_error/1, format_error_reason/1]).
 
 -export_type([value/0, array/0, object/0, key/0,
               error/0, error_reason/0,
@@ -37,8 +38,8 @@
 
 -type key() :: binary() | string() | atom().
 
--type error() :: #{reason => term(),
-                   position => position()}.
+-type error() :: #{reason := term(),
+                   position := position()}.
 
 -type error_reason() ::
         no_value
@@ -94,3 +95,39 @@ serialize(Data) ->
 -spec serialize(value(), serialization_options()) -> iodata().
 serialize(Data, Options) ->
   json_serializer:serialize(Data, Options).
+
+-spec format_error(error()) -> unicode:chardata().
+format_error(#{reason := Reason, position := {Row,Col}}) ->
+  io_lib:format("~b:~b: ~ts", [Row, Col, format_error_reason(Reason)]).
+
+-spec format_error_reason(error_reason()) -> unicode:chardata().
+format_error_reason(no_value) ->
+  "no value";
+format_error_reason({unexpected_trailing_data, _}) ->
+  "unexpected trailing data after value";
+format_error_reason({unexpected_character, _}) ->
+  "unexpected character"; % TODO char
+format_error_reason(invalid_element) ->
+  "invalid element";
+format_error_reason(truncated_string) ->
+  "truncated string";
+format_error_reason({invalid_string_character, _}) ->
+  "invalid string character"; % TODO char
+format_error_reason(invalid_utf8_sequence) ->
+  "invalid utf-8 sequence";
+format_error_reason(truncated_escape_sequence) ->
+  "truncated escape sequence";
+format_error_reason(truncated_utf16_surrogate_pair) ->
+  "truncate utf-16 surrogate pair";
+format_error_reason(invalid_escape_sequence) ->
+  "invalid escape sequence";
+format_error_reason(truncated_array) ->
+  "truncated array";
+format_error_reason(truncated_object) ->
+  "truncated object";
+format_error_reason({invalid_key, Key}) ->
+  io_lib:format("invalid object key ~ts", [json:serialize(Key)]);
+format_error_reason({duplicate_key, Key}) ->
+  io_lib:format("duplicate object key \"~ts\"", [Key]);
+format_error_reason(Reason) ->
+  io_lib:format("~0tp", [Reason]).
