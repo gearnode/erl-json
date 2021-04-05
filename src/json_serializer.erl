@@ -178,8 +178,8 @@ character(C, State) ->
 
 -spec maybe_format(iodata() | json:character(), json:value(), state()) ->
         iodata().
-maybe_format(Data, Value, #{options := #{formater := Formater}}) ->
-  {Before, After} = Formater(Value),
+maybe_format(Data, Value, #{options := #{formatter := Formatter}}) ->
+  {Before, After} = Formatter(Value),
   [Before, Data, After];
 maybe_format(Data, _, _) ->
   Data.
