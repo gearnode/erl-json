@@ -76,7 +76,7 @@ The highlighting function is called with one the following values:
 - A tuple of the form `{key, Value}` where `Value` is an object key
   represented as a binary string.
 - A tuple of the form `{character, C}` where `C` is either `$[`, `$]`, `${`,
-  `$}`, `$,`, `$"`.
+  `$}`, `$,`, `$"` or `$:`.
 
 The function returns a tuple `{Before, After}` where `Before` and `After` are
 of type `iodata()`. These two values are inserted before and after the JSON

@@ -87,7 +87,7 @@ default_serializers() ->
         fun((json:value() | {key, binary()} | {character, character()}) ->
                {Before :: iodata(), After :: iodata()}).
 
--type character() :: $[ | $] | ${ | $} | $, | $".
+-type character() :: $[ | $] | ${ | $} | $, | $" | $:.
 
 -spec parse(binary()) -> {ok, value()} | {error, term()}.
 parse(Data) ->

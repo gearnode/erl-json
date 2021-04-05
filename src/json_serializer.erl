@@ -157,10 +157,6 @@ format_time({H, M, S}) ->
 format_datetime({Date, Time}) ->
   iolist_to_binary([format_date(Date), $T, format_time(Time), $Z]).
 
--spec character(integer(), state()) -> iodata().
-character(C, State) ->
-  maybe_highlight(C, {character, C}, State).
-
 -spec indent(state()) -> state().
 indent(State = #{indent_level := Level}) ->
   State#{indent_level => Level+1}.
@@ -172,13 +168,16 @@ maybe_eol(_) ->
   [].
 
 -spec indent_string(state()) -> iodata().
-indent_string(#{indent_level := 0}) ->
-  [];
 indent_string(#{indent_level := Level, options := Options}) ->
   String = maps:get(indent_string, Options, <<"  ">>),
   [String || _ <- lists:seq(1, Level)].
 
--spec maybe_highlight(iodata(), json:value(), state()) -> iodata().
+-spec character(integer(), state()) -> iodata().
+character(C, State) ->
+  maybe_highlight(C, {character, C}, State).
+
+-spec maybe_highlight(iodata() | json:character(), json:value(), state()) ->
+        iodata().
 maybe_highlight(Data, Value, #{options := #{highlighter := Highlighter}}) ->
   {Before, After} = Highlighter(Value),
   [Before, Data, After];
