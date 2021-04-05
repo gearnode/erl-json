@@ -162,8 +162,6 @@ indent(State = #{indent_level := Level}) ->
   State#{indent_level => Level+1}.
 
 -spec maybe_eol(state()) -> iodata().
-maybe_eol(#{indent_level := 0}) ->
-  [$\n];
 maybe_eol(State = #{options := #{indent := true}}) ->
   [$\n, indent_string(State)];
 maybe_eol(_) ->
