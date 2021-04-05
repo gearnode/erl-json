@@ -38,22 +38,22 @@ serialize(Value, Options0) ->
 
 -spec serialize1(json:value(), state()) -> iodata().
 serialize1(null, State) ->
-  maybe_highlight(<<"null">>, null, State);
+  maybe_format(<<"null">>, null, State);
 serialize1(true, State) ->
-  maybe_highlight(<<"true">>, true, State);
+  maybe_format(<<"true">>, true, State);
 serialize1(false, State) ->
-  maybe_highlight(<<"false">>, false, State);
+  maybe_format(<<"false">>, false, State);
 serialize1(Value, State) when is_integer(Value) ->
   Data = integer_to_binary(Value),
-  maybe_highlight(Data, Value, State);
+  maybe_format(Data, Value, State);
 serialize1(Value, State) when is_float(Value) ->
   Data = erlang:float_to_binary(Value, [compact, {decimals, 17}]),
-  maybe_highlight(Data, Value, State);
+  maybe_format(Data, Value, State);
 serialize1(Value, State) when is_binary(Value) ->
   Data = [character($", State),
           escape(Value, State, <<>>),
           character($", State)],
-  maybe_highlight(Data, Value, State);
+  maybe_format(Data, Value, State);
 serialize1([], State) ->
   [character($[, State), character($], State)];
 serialize1(Value, State) when is_list(Value) ->
@@ -64,7 +64,7 @@ serialize1(Value, State) when is_list(Value) ->
                      [serialize1(V, State2) || V <- Value]),
           maybe_eol(State),
           character($], State)],
-  maybe_highlight(Data, Value, State);
+  maybe_format(Data, Value, State);
 serialize1(Value, State) when is_map(Value), map_size(Value) =:= 0 ->
   [character(${, State), character($}, State)];
 serialize1(Value, State) when is_map(Value) ->
@@ -80,7 +80,7 @@ serialize1(Value, State) when is_map(Value) ->
           lists:join([character($,, State), EOL], Members),
           maybe_eol(State),
           character($}, State)],
-  maybe_highlight(Data, Value, State);
+  maybe_format(Data, Value, State);
 serialize1({Type, Value},
            State = #{options := #{serializers := Serializers}}) ->
   case maps:find(Type, Serializers) of
@@ -105,7 +105,7 @@ serialize_key(Key, State) when is_atom(Key) ->
 serialize_key(Key, State) ->
   Value = unicode:characters_to_binary(Key),
   Data = [$", escape(Value, State, <<>>), $"],
-  maybe_highlight(Data, {key, Value}, State).
+  maybe_format(Data, {key, Value}, State).
 
 -spec escape(binary(), state(), Acc :: binary()) -> binary().
 escape(<<>>, _, Acc) ->
@@ -176,12 +176,12 @@ indent_string(#{indent_level := Level, options := Options}) ->
 
 -spec character(integer(), state()) -> iodata().
 character(C, State) ->
-  maybe_highlight(C, {character, C}, State).
+  maybe_format(C, {character, C}, State).
 
--spec maybe_highlight(iodata() | json:character(), json:value(), state()) ->
+-spec maybe_format(iodata() | json:character(), json:value(), state()) ->
         iodata().
-maybe_highlight(Data, Value, #{options := #{highlighter := Highlighter}}) ->
-  {Before, After} = Highlighter(Value),
+maybe_format(Data, Value, #{options := #{formater := Formater}}) ->
+  {Before, After} = Formater(Value),
   [Before, Data, After];
-maybe_highlight(Data, _, _) ->
+maybe_format(Data, _, _) ->
   Data.

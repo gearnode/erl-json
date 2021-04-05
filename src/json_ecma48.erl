@@ -14,15 +14,15 @@
 
 -module(json_ecma48).
 
--export([highlight/1]).
+-export([format/1]).
 
--spec highlight(Value) -> {iodata(), iodata()} when
+-spec format(Value) -> {iodata(), iodata()} when
     Value :: json:value() | {key, binary()} | {character, json:character()}.
-highlight(null) ->
+format(null) ->
   {<<"\e[31m">>, <<"\e[0m">>};
-highlight(V) when V =:= true; V =:= false ->
+format(V) when V =:= true; V =:= false ->
   {<<"\e[32m">>, <<"\e[0m">>};
-highlight({key, _}) ->
+format({key, _}) ->
   {<<"\e[33m">>, <<"\e[0m">>};
-highlight(_) ->
+format(_) ->
   {[], []}.

@@ -24,7 +24,7 @@
               parsing_options/0, duplicate_key_handling/0,
               serialization_options/0,
               serialization_fun/0, serializers/0,
-              highlighter/0, character/0]).
+              formater/0, character/0]).
 
 -type value() :: null
                | boolean()
@@ -70,7 +70,7 @@
                                    serializers => serializers(),
                                    indent => boolean(),
                                    indent_string => binary() | string(),
-                                   highlighter => highlighter()}.
+                                   formater => formater()}.
 
 -type serialization_fun() ::
         fun((term()) -> {data, iodata()} | {value, json:value()}).
@@ -83,7 +83,7 @@ default_serializers() ->
     time => fun json_serializer:serialize_time/1,
     datetime => fun json_serializer:serialize_datetime/1}.
 
--type highlighter() ::
+-type formater() ::
         fun((json:value() | {key, binary()} | {character, character()}) ->
                {Before :: iodata(), After :: iodata()}).
 

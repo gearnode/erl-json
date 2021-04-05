@@ -66,11 +66,11 @@ The following serializers are available in the default serializer map:
 | `time`     | `calendar:time()`     | RFC 3339 simple time string. |
 | `datetime` | `calendar:datetime()` | RFC 3339 datetime string.    |
 
-### Highlighting
-Highlighting is performed during serialization if an highlighting function was
+### Formatting
+Formatting is performed during serialization if a formatting function was
 provided in options.
 
-The highlighting function is called with one the following values:
+The formatting function is called with one the following values:
 - A JSON value, i.e. either `null`, `true`, `false`, a number, a binary
   string, a list or a map.
 - A tuple of the form `{key, Value}` where `Value` is an object key
@@ -82,8 +82,8 @@ The function returns a tuple `{Before, After}` where `Before` and `After` are
 of type `iodata()`. These two values are inserted before and after the JSON
 value, key or character in the output.
 
-As a convenience, erl-json provides `fun json_ecma48:highlight/1` which uses
-ECMA-48 terminal escape sequences to color JSON strings.
+As a convenience, erl-json provides `fun json_ecma48:format/1` which uses
+ECMA-48 terminal escape sequences to highlight JSON strings.
 
 ### Options
 Serialization options are represented as a map. The following options are available:
@@ -94,7 +94,7 @@ Serialization options are represented as a map. The following options are availa
 - `indent`: a boolean indicating whether to indent content or not.
 - `indent_string`: a string or binary used as indentation prefix; the default
   value is a binary containing two whitespace characters.
-- `highlighter`: an highlighting function to use.
+- `formatter`: a formatting function to use.
 
 ## JSON Pointer
 The `json_pointer:find/2` function is used to obtain the value referenced by a
