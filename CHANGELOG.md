@@ -3,6 +3,7 @@
 # Next Version
 ## Features
 - Add optional indentation for serialization.
+- Add optional highlighting for serialization.
 
 # 1.3.0
 ## Features
