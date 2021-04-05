@@ -28,7 +28,7 @@ serialize(Value, Options0) ->
   Options = Options0#{serializers => Serializers},
   State = #{options => Options,
             indent_level => 0},
-  Data = serialize1(Value, State),
+  Data = [serialize1(Value, State), maybe_eol(State)],
   case maps:get(return_binary, Options, false) of
     true ->
       iolist_to_binary(Data);
@@ -162,6 +162,8 @@ indent(State = #{indent_level := Level}) ->
   State#{indent_level => Level+1}.
 
 -spec maybe_eol(state()) -> iodata().
+maybe_eol(#{indent_level := 0}) ->
+  [$\n];
 maybe_eol(State = #{options := #{indent := true}}) ->
   [$\n, indent_string(State)];
 maybe_eol(_) ->
