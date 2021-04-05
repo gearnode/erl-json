@@ -43,7 +43,7 @@ For example, `json:serialize([1, 2, 3], #{return_binary => true})` returns
 Serialization functions will signal an error of the form `{invalid_value,
 Term}` if an Erlang term cannot be represented in JSON.
 
-## Serializers
+### Serializers
 While serialization functions usually handle terms which map directly to JSON
 values, they also accept terms of the form `{Type, Value}`. To serialize
 `Value`, the serializer looks for a serialization function associated with the
@@ -57,7 +57,6 @@ must return one of the following two values:
   transformation;
 - `{value, json:value()}`: the value is serialized as any other JSON value.
 
-### Default serializers
 The following serializers are available in the default serializer map:
 
 | Type       | Value type            | Description                  |
@@ -73,6 +72,9 @@ Serialization options are represented as a map. The following options are availa
   value.
 - `serializers`: a map associating types (as atoms) and serialization
   functions to be used as a replacement for the default serializer map.
+- `indent`: a boolean indicating whether to indent content or not.
+- `indent_string`: a string or binary used as indentation prefix; the default
+  value is a binary containing two whitespace characters.
 
 ## JSON Pointer
 The `json_pointer:find/2` function is used to obtain the value referenced by a

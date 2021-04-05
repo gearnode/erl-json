@@ -66,7 +66,9 @@
 -type duplicate_key_handling() :: first | last | error.
 
 -type serialization_options() :: #{return_binary => boolean(),
-                                   serializers => serializers()}.
+                                   serializers => serializers(),
+                                   indent => boolean(),
+                                   indent_string => binary() | string()}.
 
 -type serialization_fun() ::
         fun((term()) -> {data, iodata()} | {value, json:value()}).

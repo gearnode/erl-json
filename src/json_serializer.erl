@@ -18,11 +18,17 @@
          serialize_data/1,
          serialize_date/1, serialize_time/1, serialize_datetime/1]).
 
+-type state() ::
+        #{options := json:serialization_options(),
+          indent_level := non_neg_integer()}.
+
 -spec serialize(json:value(), json:serialization_options()) -> iodata().
 serialize(Value, Options0) ->
   Serializers = maps:get(serializers, Options0, json:default_serializers()),
   Options = Options0#{serializers => Serializers},
-  Data = serialize1(Value, Options),
+  State = #{options => Options,
+            indent_level => 0},
+  Data = serialize1(Value, State),
   case maps:get(return_binary, Options, false) of
     true ->
       iolist_to_binary(Data);
@@ -30,73 +36,85 @@ serialize(Value, Options0) ->
       Data
   end.
 
--spec serialize1(json:value(), json:serialization_options()) -> iodata().
-serialize1(null, _Options) ->
+-spec serialize1(json:value(), state()) -> iodata().
+serialize1(null, _) ->
   <<"null">>;
-serialize1(true, _Options) ->
+serialize1(true, _) ->
   <<"true">>;
-serialize1(false, _Options) ->
+serialize1(false, _) ->
   <<"false">>;
-serialize1(Value, _Options) when is_integer(Value) ->
+serialize1(Value, _) when is_integer(Value) ->
   integer_to_binary(Value);
-serialize1(Value, _Options) when is_float(Value) ->
+serialize1(Value, _) when is_float(Value) ->
   erlang:float_to_binary(Value, [compact, {decimals, 17}]);
-serialize1(Value, Options) when is_binary(Value) ->
-  [$", escape(Value, Options, <<>>), $"];
-serialize1(Value, Options) when is_list(Value) ->
-  F = fun (V) -> serialize(V, Options) end,
-  [$[, lists:join($,, lists:map(F, Value)), $]];
-serialize1(Value, Options) when is_map(Value) ->
+serialize1(Value, State) when is_binary(Value) ->
+  [$", escape(Value, State, <<>>), $"];
+serialize1([], _) ->
+  <<"[]">>;
+serialize1(Value, State) when is_list(Value) ->
+  State2 = indent(State),
+  EOL = maybe_eol(State2),
+  F = fun (V) -> serialize1(V, State2) end,
+  [$[, EOL,
+   lists:join([$,, EOL], lists:map(F, Value)), maybe_eol(State),
+   $]];
+serialize1(Value, _) when is_map(Value), map_size(Value) =:= 0 ->
+  <<"{}">>;
+serialize1(Value, State) when is_map(Value) ->
+  State2 = indent(State),
+  EOL = maybe_eol(State2),
   F = fun (K, V, Acc) ->
-          [[serialize_key(K, Options), $:, serialize1(V, Options)] | Acc]
+          [[serialize_key(K, State), $:, serialize1(V, State2)] | Acc]
       end,
   Members = lists:reverse(maps:fold(F, [], Value)),
-  [${, lists:join($,, Members), $}];
-serialize1({Type, Value}, Options = #{serializers := Serializers}) ->
+  [${, EOL,
+   lists:join([$,, EOL], Members), maybe_eol(State),
+   $}];
+serialize1({Type, Value},
+           State = #{options := #{serializers := Serializers}}) ->
   case maps:find(Type, Serializers) of
     {ok, Serialize} ->
       case Serialize(Value) of
         {data, Data} ->
           Data;
         {value, Value2} ->
-          serialize1(Value2, Options)
+          serialize1(Value2, State)
       end;
     error ->
       error({unknown_type, Type})
   end;
-serialize1({Type, _}, _Options) ->
+serialize1({Type, _}, _) ->
   error({unknown_type, Type});
-serialize1(Value, _Options) ->
+serialize1(Value, _) ->
   error({invalid_value, Value}).
 
--spec serialize_key(json:key(), json:serialization_options()) -> iodata().
-serialize_key(Key, Options) when is_atom(Key) ->
-  serialize_key(atom_to_binary(Key), Options);
-serialize_key(Key, Options) ->
-  serialize1(unicode:characters_to_binary(Key), Options).
+-spec serialize_key(json:key(), state()) -> iodata().
+serialize_key(Key, State) when is_atom(Key) ->
+  serialize_key(atom_to_binary(Key), State);
+serialize_key(Key, State) ->
+  serialize1(unicode:characters_to_binary(Key), State).
 
--spec escape(binary(), json:serialization_options(), Acc :: binary()) ->
-        binary().
-escape(<<>>, _Options, Acc) ->
+-spec escape(binary(), state(), Acc :: binary()) -> binary().
+escape(<<>>, _, Acc) ->
   Acc;
-escape(<<C, S/binary>>, Options, Acc) when
+escape(<<C, S/binary>>, State, Acc) when
     C =:= $"; C =:= $\\; C =:= $/ ->
-  escape(S, Options, <<Acc/binary, $\\, C>>);
-escape(<<$\b, S/binary>>, Options, Acc) ->
-  escape(S, Options, <<Acc/binary, $\\, $b>>);
-escape(<<$\f, S/binary>>, Options, Acc) ->
-  escape(S, Options, <<Acc/binary, $\\, $f>>);
-escape(<<$\r, S/binary>>, Options, Acc) ->
-  escape(S, Options, <<Acc/binary, $\\, $r>>);
-escape(<<$\n, S/binary>>, Options, Acc) ->
-  escape(S, Options, <<Acc/binary, $\\, $n>>);
-escape(<<$\t, S/binary>>, Options, Acc) ->
-  escape(S, Options, <<Acc/binary, $\\, $t>>);
-escape(<<C/utf8, S/binary>>, Options, Acc) when C =< 16#1f ->
+  escape(S, State, <<Acc/binary, $\\, C>>);
+escape(<<$\b, S/binary>>, State, Acc) ->
+  escape(S, State, <<Acc/binary, $\\, $b>>);
+escape(<<$\f, S/binary>>, State, Acc) ->
+  escape(S, State, <<Acc/binary, $\\, $f>>);
+escape(<<$\r, S/binary>>, State, Acc) ->
+  escape(S, State, <<Acc/binary, $\\, $r>>);
+escape(<<$\n, S/binary>>, State, Acc) ->
+  escape(S, State, <<Acc/binary, $\\, $n>>);
+escape(<<$\t, S/binary>>, State, Acc) ->
+  escape(S, State, <<Acc/binary, $\\, $t>>);
+escape(<<C/utf8, S/binary>>, State, Acc) when C =< 16#1f ->
   CData = iolist_to_binary(io_lib:format(<<"\\u~4.16.0b">>, [C])),
-  escape(S, Options, <<Acc/binary, CData/binary>>);
-escape(<<C/utf8, S/binary>>, Options, Acc) ->
-  escape(S, Options, <<Acc/binary, C/utf8>>).
+  escape(S, State, <<Acc/binary, CData/binary>>);
+escape(<<C/utf8, S/binary>>, State, Acc) ->
+  escape(S, State, <<Acc/binary, C/utf8>>).
 
 -spec serialize_data(iodata()) -> {data, iodata()}.
 serialize_data(Data) ->
@@ -125,3 +143,20 @@ format_time({H, M, S}) ->
 -spec format_datetime(calendar:datetime()) -> binary().
 format_datetime({Date, Time}) ->
   iolist_to_binary([format_date(Date), $T, format_time(Time), $Z]).
+
+-spec indent(state()) -> state().
+indent(State = #{indent_level := Level}) ->
+  State#{indent_level => Level+1}.
+
+-spec maybe_eol(state()) -> iodata().
+maybe_eol(State = #{options := #{indent := true}}) ->
+  [$\n, indent_string(State)];
+maybe_eol(_) ->
+  [].
+
+-spec indent_string(state()) -> iodata().
+indent_string(#{indent_level := 0}) ->
+  [];
+indent_string(#{indent_level := Level, options := Options}) ->
+  String = maps:get(indent_string, Options, <<"  ">>),
+  [String || _ <- lists:seq(1, Level)].

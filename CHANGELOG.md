@@ -1,6 +1,8 @@
 % erl-json changelog
 
 # Next Version
+## Features
+- Add optional indentation for serialization.
 
 # 1.3.0
 ## Features
