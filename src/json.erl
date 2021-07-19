@@ -39,7 +39,7 @@
 
 -type key() :: binary() | string() | atom().
 
--type error() :: #{reason := term(),
+-type error() :: #{reason := error_reason(),
                    position := position()}.
 
 -type error_reason() ::
@@ -89,7 +89,7 @@ default_serializers() ->
 
 -type character() :: $[ | $] | ${ | $} | $, | $" | $:.
 
--spec parse(binary()) -> {ok, value()} | {error, term()}.
+-spec parse(binary()) -> {ok, value()} | {error, error()}.
 parse(Data) ->
   parse(Data, #{}).
 
