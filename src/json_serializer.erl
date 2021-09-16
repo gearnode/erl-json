@@ -67,12 +67,16 @@ serialize1(Value, State) when is_list(Value) ->
   maybe_format(Data, Value, State);
 serialize1(Value, State) when is_map(Value), map_size(Value) =:= 0 ->
   [character(${, State), character($}, State)];
-serialize1(Value, State) when is_map(Value) ->
+serialize1(Value, State = #{options := Options}) when is_map(Value) ->
   State2 = indent(State),
   EOL = maybe_eol(State2),
   F = fun (K, V, Acc) ->
           [[serialize_key(K, State),
             character($:, State),
+            case maps:get(indent, Options, false) of
+              true -> $\s;
+              false -> []
+            end,
             serialize1(V, State2)] | Acc]
       end,
   Members = lists:reverse(maps:fold(F, [], Value)),
