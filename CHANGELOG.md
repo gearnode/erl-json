@@ -4,6 +4,7 @@
 ## Features
 - Add optional indentation for serialization.
 - Add optional formatting for serialization.
+- Add support for integer minimum and maximum values.
 
 # 1.3.0
 ## Features

@@ -57,12 +57,16 @@
       | truncated_object
       | {invalid_key, value()}
       | {duplicate_key, binary()}
-      | invalid_number.
+      | invalid_number
+      | integer_too_small
+      | integer_too_large.
 
 -type position() :: {Line :: pos_integer(), Column :: pos_integer()}.
 
 -type parsing_options() :: #{duplicate_key_handling =>
-                               duplicate_key_handling()}.
+                               duplicate_key_handling(),
+                             min_integer => integer(),
+                             max_integer => integer()}.
 
 -type duplicate_key_handling() :: first | last | error.
 
@@ -138,6 +142,12 @@ format_error_reason(truncated_object) ->
 format_error_reason({invalid_key, Key}) ->
   io_lib:format("invalid object key ~ts", [json:serialize(Key)]);
 format_error_reason({duplicate_key, Key}) ->
-  io_lib:format("duplicate object key \"~ts\"", [Key]);
+  io_lib:format("duplicate object key ~ts", [json:serialize(Key)]);
+format_error_reason(invalid_number) ->
+  "invalid number";
+format_error_reason(integer_too_small) ->
+  "integer too small";
+format_error_reason(integer_too_large) ->
+  "integer too large";
 format_error_reason(Reason) ->
   io_lib:format("~0tp", [Reason]).

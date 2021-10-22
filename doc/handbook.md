@@ -23,6 +23,8 @@ Parsing options are represented as a map. The following options are available:
   - `last`: keep the value associated with the last occurrence of the key.
   - `error`: return an error with the `{duplicate_key, Key}` reason.
   The default value is `last`.
+- `min_integer`: the minimum value for all integers.
+- `max_integer`: the maximum value for all integers.
 
 ### Errors
 Parsing errors are returned as maps which may contain the following fields:

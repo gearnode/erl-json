@@ -234,8 +234,13 @@ parse(object_end, Nexts, <<$}, Data/binary>>,
 parse(number, Nexts, Data, Stack, {R,C}, Options) ->
   case parse_number(Data) of
     {ok, Number, N, Rest} ->
-      Stack2 = stack_merge(Number, Stack),
-      parse(whitespace, Nexts, Rest, Stack2, {R,C+N}, Options);
+      case check_number(Number, Options) of
+        ok ->
+          Stack2 = stack_merge(Number, Stack),
+          parse(whitespace, Nexts, Rest, Stack2, {R,C+N}, Options);
+        {error, Reason} ->
+          {error, #{reason => Reason, position => {R,C}}}
+      end;
     {error, Reason, N} ->
       {error, #{reason => Reason, position => {R,C+N}}}
   end;
@@ -446,6 +451,27 @@ parse_integer(Data = <<C, Rest/binary>>, N, I) ->
     false ->
       {I, N, Data}
   end.
+
+-spec check_number(number(), json:parsing_options()) ->
+        ok | {error, json:error_reason()}.
+check_number(I, Options = #{min_integer := Min}) when is_integer(I) ->
+  if
+    I >= Min ->
+      check_number(I, maps:remove(min_integer, Options));
+    I < Min ->
+      {error, integer_too_small}
+  end;
+check_number(I, Options = #{max_integer := Max}) when is_integer(I) ->
+  if
+    I =< Max ->
+      check_number(I, maps:remove(max_integer, Options));
+    I > Max ->
+      {error, integer_too_large}
+  end;
+check_number(I, _Options) when is_integer(I) ->
+  ok;
+check_number(F, _Options) when is_float(F) ->
+  ok.
 
 -spec is_digit(integer()) -> boolean().
 is_digit(C) when C >= $0, C =< $9 ->

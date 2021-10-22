@@ -93,7 +93,17 @@ parse_numbers_test_() ->
    ?_assertEqual({ok, -3000.0},
                  parse(<<"-0.3e4">>)),
    ?_assertEqual({ok, -0.00000000123456},
-                 parse(<<"-123.456e-11">>))].
+                 parse(<<"-123.456e-11">>)),
+   ?_assertEqual({ok, 5},
+                 parse(<<"5">>, #{min_integer => 1, max_integer => 6})),
+   ?_assertEqual({ok, 1},
+                 parse(<<"1">>, #{min_integer => 1, max_integer => 6})),
+   ?_assertEqual({ok, 6},
+                 parse(<<"6">>, #{min_integer => 1, max_integer => 6})),
+   ?_assertEqual({error, #{position => {1,1},reason => integer_too_small}},
+                 parse(<<"0">>, #{min_integer => 1, max_integer => 6})),
+   ?_assertEqual({error, #{position => {1,1},reason => integer_too_large}},
+                 parse(<<"7">>, #{min_integer => 1, max_integer => 6}))].
 
 parse_strings_test_() ->
   [?_assertEqual({ok, <<"">>},
