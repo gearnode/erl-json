@@ -12,7 +12,7 @@ The project currently supports:
 
 # Documentation
 A handbook is available [in the `doc`
-directory](https://github.com/galdor/erl-json/blob/master/doc/handbook.md).
+directory](https://github.com/exograd/erl-json/blob/master/doc/handbook.md).
 
 # Contact
 If you find a bug or have any question, feel free to open a GitHub issue.
